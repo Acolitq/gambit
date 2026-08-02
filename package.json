@@ -1,0 +1,28 @@
+{
+  "name": "gambit",
+  "version": "1.0.0",
+  "description": "A clean, simple chess app — play against bots or get matched with a random opponent online.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "keywords": [
+    "chess",
+    "game",
+    "websocket",
+    "matchmaking",
+    "minimax"
+  ],
+  "author": "Acolitq",
+  "license": "MIT",
+  "dependencies": {
+    "chess.js": "^1.0.0",
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
