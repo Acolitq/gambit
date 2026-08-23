@@ -1,0 +1,231 @@
+/* Design tokens, reset, typography and shared controls. */
+
+:root {
+  --bg: #f7f5f2;
+  --surface: #ffffff;
+  --surface-alt: #efebe5;
+  --border: #e1dcd3;
+  --text-primary: #211f1c;
+  --text-secondary: #6f6a62;
+  --accent: #b5651d;
+  --accent-hover: #9c5518;
+  --secondary: #3e6b5c;
+  --success: #2e7d4f;
+  --danger: #b33a3a;
+  --focus-ring: rgba(181, 101, 29, 0.4);
+
+  --sq-light: #ede4d3;
+  --sq-dark: #8c6b4f;
+  --piece-white: #fafaf7;
+  --piece-black: #211f1c;
+  --last-move: rgba(242, 201, 76, 0.42);
+
+  --font-display: "Manrope", -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Inter", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+
+  --radius-card: 16px;
+  --radius-panel: 12px;
+  --radius-btn: 10px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-raised: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="dark"] {
+  --bg: #15140f;
+  --surface: #1e1c17;
+  --surface-alt: #26241d;
+  --border: #33312a;
+  --text-primary: #f2efe9;
+  --text-secondary: #a8a297;
+  --accent: #e08a3e;
+  --accent-hover: #f0a159;
+  --secondary: #5c9482;
+  --success: #4caf7d;
+  --danger: #d9635c;
+  --focus-ring: rgba(224, 138, 62, 0.45);
+
+  --sq-light: #d8cdb8;
+  --sq-dark: #6b5138;
+  --piece-white: #f6f2ea;
+  --piece-black: #16130d;
+  --shadow-raised: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15140f;
+    --surface: #1e1c17;
+    --surface-alt: #26241d;
+    --border: #33312a;
+    --text-primary: #f2efe9;
+    --text-secondary: #a8a297;
+    --accent: #e08a3e;
+    --accent-hover: #f0a159;
+    --secondary: #5c9482;
+    --success: #4caf7d;
+    --danger: #d9635c;
+    --focus-ring: rgba(224, 138, 62, 0.45);
+    --sq-light: #d8cdb8;
+    --sq-dark: #6b5138;
+    --piece-white: #f6f2ea;
+    --piece-black: #16130d;
+    --shadow-raised: 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  margin: 0;
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* Top bar */
+.topbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.topbar-brand {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.theme-toggle:hover {
+  background: var(--surface-alt);
+  color: var(--text-primary);
+}
+
+/* Buttons */
+.btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius-btn);
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background-color 150ms ease, transform 100ms ease, box-shadow 150ms ease,
+    border-color 150ms ease;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-block {
+  width: 100%;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+.btn-ghost:hover {
+  background: var(--surface-alt);
+  color: var(--text-primary);
+}
+.btn-danger-outline {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.btn-danger-outline:hover {
+  background: var(--danger);
+  color: #fff;
+}
+.text-link {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 4px;
+}
+.text-link:hover {
+  color: var(--text-primary);
+}
+
+/* Card + form primitives */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.field {
+  margin-bottom: 32px;
+}
+.field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.screen {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
