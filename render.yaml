@@ -1,0 +1,11 @@
+# One-click deploy config for Render (https://render.com).
+services:
+  - type: web
+    name: gambit
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.0
