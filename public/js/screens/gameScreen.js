@@ -98,7 +98,8 @@ export const gameScreen = {
       onCaptured: renderCaptured,
       onGameOver: (payload) => {
         stopClock();
-        store.set({ lastResult: payload });
+        // Stash the game PGN so the result screen can offer post-game analysis.
+        store.set({ lastResult: payload, lastPgn: controller.getPgn() });
         setTimeout(() => navigate('result'), 600);
       },
     });

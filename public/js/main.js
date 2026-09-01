@@ -4,12 +4,14 @@ import { setupScreen } from './screens/setupScreen.js';
 import { queueScreen } from './screens/queueScreen.js';
 import { gameScreen } from './screens/gameScreen.js';
 import { resultScreen } from './screens/resultScreen.js';
+import { analysisScreen } from './screens/analysisScreen.js';
 
 registerRoute('menu', menuScreen);
 registerRoute('setup', setupScreen);
 registerRoute('queue', queueScreen);
 registerRoute('game', gameScreen);
 registerRoute('result', resultScreen);
+registerRoute('analysis', analysisScreen);
 
 // Theme: respect a saved preference, else follow the system setting.
 (function initTheme() {

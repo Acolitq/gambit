@@ -37,6 +37,7 @@ export const resultScreen = {
         <p class="result-reason">${REASON_TEXT[reason] || ''}</p>
         <div class="result-actions">
           <button class="btn btn-primary again-btn">${mode === 'bot' ? 'Play again' : 'New opponent'}</button>
+          <button class="btn btn-secondary analyze-btn">Analyze this game</button>
           <button class="btn btn-ghost menu-btn">Main menu</button>
         </div>
       </div>
@@ -45,6 +46,7 @@ export const resultScreen = {
     wrap.querySelector('.again-btn').addEventListener('click', () => {
       navigate(mode === 'bot' ? 'setup' : 'queue');
     });
+    wrap.querySelector('.analyze-btn').addEventListener('click', () => navigate('analysis'));
     wrap.querySelector('.menu-btn').addEventListener('click', () => navigate('menu'));
 
     root.appendChild(wrap);

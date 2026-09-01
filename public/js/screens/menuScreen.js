@@ -19,6 +19,11 @@ export const menuScreen = {
           <span class="menu-card-title">Play Online</span>
           <span class="menu-card-sub">Get matched with a waiting opponent</span>
         </button>
+        <button class="menu-card menu-card-study" data-nav="analysis">
+          <span class="menu-card-icon">⌕</span>
+          <span class="menu-card-title">Analyze a Game</span>
+          <span class="menu-card-sub">Engine review with an accuracy report</span>
+        </button>
       </div>
       <p class="menu-footer">A portfolio project · open source</p>
     `;
@@ -30,6 +35,10 @@ export const menuScreen = {
     wrap.querySelector('[data-mode="online"]').addEventListener('click', () => {
       store.set({ mode: 'online' });
       navigate('queue');
+    });
+    wrap.querySelector('[data-nav="analysis"]').addEventListener('click', () => {
+      store.set({ lastPgn: null }); // open a blank analyzer, not the last game
+      navigate('analysis');
     });
 
     root.appendChild(wrap);

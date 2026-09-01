@@ -206,6 +206,7 @@ export function createGame(opts) {
     applyRemoteMove,
     revertLastLocal,
     syncFromFen,
+    getPgn: () => chess.pgn(),
     start,
     resign,
     forceOver,
