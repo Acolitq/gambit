@@ -1,9 +1,16 @@
+import { Chess } from 'chess.js';
 import { navigate } from '../router.js';
 import { store } from '../store.js';
 import { createBoard } from '../ui/board.js';
 import { createEvalGraph } from '../analysis/evalGraph.js';
+import { createEvalBar } from '../analysis/evalBar.js';
 import { analyzeGame } from '../analysis/analyzer.js';
 import { getEngine } from '../analysis/engineSingleton.js';
+import { formatEval } from '../analysis/evalFormat.js';
+
+// Live engine settings for the interactive panel.
+const LIVE_DEPTH = 22;
+const LIVE_MULTIPV = 3;
 
 // A sample game so the page is never empty (Morphy's "Opera Game", 1858).
 const SAMPLE_PGN = `[Event "Paris Opera"]
@@ -19,14 +26,16 @@ const SAMPLE_PGN = `[Event "Paris Opera"]
 
 export const analysisScreen = {
   mount(root) {
-    const preset = store.get('lastResult');
     const presetPgn = store.get('lastPgn');
 
     const wrap = document.createElement('div');
     wrap.className = 'screen analysis-screen';
     wrap.innerHTML = `
       <div class="analysis-main">
-        <div class="board-host"></div>
+        <div class="board-row">
+          <div class="eval-bar-host"></div>
+          <div class="board-host"></div>
+        </div>
         <div class="review-controls">
           <button class="btn btn-ghost nav-btn" data-nav="start" title="Start">⏮</button>
           <button class="btn btn-ghost nav-btn" data-nav="prev" title="Previous (←)">◀</button>
@@ -37,14 +46,14 @@ export const analysisScreen = {
       </div>
       <aside class="analysis-side">
         <div class="analysis-header">
-          <h2>Game Analysis</h2>
+          <h2>Analysis</h2>
           <button class="text-link back-link">← Menu</button>
         </div>
 
         <div class="import-block">
-          <textarea class="pgn-input" placeholder="Paste PGN here…" rows="4"></textarea>
+          <textarea class="pgn-input" placeholder="Paste PGN here…" rows="3"></textarea>
           <div class="import-row">
-            <label class="depth-label">Depth
+            <label class="depth-label">Full-game depth
               <select class="depth-select">
                 <option value="10">10 (fast)</option>
                 <option value="12" selected>12</option>
@@ -54,9 +63,7 @@ export const analysisScreen = {
             </label>
             <button class="btn btn-primary analyze-btn">Analyze</button>
           </div>
-          <div class="sample-row">
-            <button class="text-link sample-btn">Load sample game</button>
-          </div>
+          <div class="sample-row"><button class="text-link sample-btn">Load sample game</button></div>
         </div>
 
         <div class="analysis-progress" hidden>
@@ -69,22 +76,31 @@ export const analysisScreen = {
           <div class="acc-side acc-black"><span class="acc-label">Black</span><span class="acc-value">—</span></div>
         </div>
 
+        <div class="engine-panel">
+          <div class="engine-head">
+            <span class="engine-title">Engine</span>
+            <span class="engine-depth"></span>
+          </div>
+          <div class="move-assessment" hidden></div>
+          <div class="engine-lines"></div>
+        </div>
+
         <div class="eval-graph-host"></div>
         <div class="analysis-move-list"></div>
       </aside>
     `;
     root.appendChild(wrap);
 
-    const boardHost = wrap.querySelector('.board-host');
     let orientation = 'w';
     const board = createBoard({
-      mount: boardHost,
+      mount: wrap.querySelector('.board-host'),
       orientation,
-      onMove: () => {}, // review only
+      onMove: () => {},
       legalMovesFor: () => [],
     });
     board.setInteractive(false);
 
+    const evalBar = createEvalBar(wrap.querySelector('.eval-bar-host'));
     const graph = createEvalGraph(wrap.querySelector('.eval-graph-host'), (ply) => goTo(ply));
     const moveListEl = wrap.querySelector('.analysis-move-list');
     const progressEl = wrap.querySelector('.analysis-progress');
@@ -92,21 +108,97 @@ export const analysisScreen = {
     const progressText = wrap.querySelector('.progress-text');
     const accBlock = wrap.querySelector('.accuracy-block');
     const pgnInput = wrap.querySelector('.pgn-input');
+    const engineDepthEl = wrap.querySelector('.engine-depth');
+    const engineLinesEl = wrap.querySelector('.engine-lines');
+    const assessEl = wrap.querySelector('.move-assessment');
 
     let report = null;
-    let cursor = 0; // 0 = start position, i = after move i
+    let cursor = 0;
+    let engine = null;
+
+    function currentFen() {
+      if (!report) return new Chess().fen();
+      return cursor === 0 ? report.moves[0]?.fenBefore : report.moves[cursor - 1].fenAfter;
+    }
 
     function goTo(ply) {
       if (!report) return;
       cursor = Math.max(0, Math.min(report.moves.length, ply));
-      const fen = cursor === 0 ? report.moves[0]?.fenBefore : report.moves[cursor - 1].fenAfter;
+      const fen = currentFen();
       if (fen) board.setPosition(fen);
       if (cursor > 0) {
         const m = report.moves[cursor - 1];
         board.highlightLastMove(m.uci.slice(0, 2), m.uci.slice(2, 4));
+        evalBar.setEval({ scoreCp: m.evalCp, mate: m.mate });
+      } else {
+        board.highlightLastMove(null, null);
+        evalBar.setEval(report.evalSeries[0]);
       }
       graph.setActive(cursor);
       highlightActiveRow();
+      updateAssessment();
+      runLiveEngine(fen);
+    }
+
+    // Live multi-line engine analysis of the current position.
+    function runLiveEngine(fen) {
+      if (!fen || !engine) return;
+      engineLinesEl.classList.add('thinking');
+      engine
+        .analyze(fen, {
+          depth: LIVE_DEPTH,
+          multiPv: LIVE_MULTIPV,
+          onUpdate: (lines) => renderEngineLines(lines, fen),
+        })
+        .then((lines) => {
+          engineLinesEl.classList.remove('thinking');
+          renderEngineLines(lines, fen);
+        });
+    }
+
+    function renderEngineLines(lines, fen) {
+      if (!lines.length) return;
+      engineDepthEl.textContent = `depth ${lines[0].depth}`;
+      // Top line drives the eval bar (already White-perspective).
+      evalBar.setEval({ scoreCp: lines[0].scoreCp, mate: lines[0].mate });
+
+      engineLinesEl.innerHTML = '';
+      for (const line of lines) {
+        const sans = pvToSan(fen, line.pv, 6);
+        const row = document.createElement('div');
+        row.className = 'engine-line';
+        const evalStr = formatEval({ scoreCp: line.scoreCp, mate: line.mate });
+        const positive = (line.mate ?? line.scoreCp ?? 0) >= 0;
+        row.innerHTML = `
+          <span class="el-eval ${positive ? 'pos' : 'neg'}">${evalStr}</span>
+          <span class="el-moves">${sans.join(' ')}</span>
+        `;
+        engineLinesEl.appendChild(row);
+      }
+    }
+
+    function updateAssessment() {
+      if (cursor === 0 || !report) {
+        assessEl.hidden = true;
+        return;
+      }
+      const m = report.moves[cursor - 1];
+      assessEl.hidden = false;
+      const q = m.quality;
+      const showLoss = ['inaccuracy', 'mistake', 'blunder'].includes(q.key);
+      let bestSan = '';
+      if (m.bestMove && showLoss) {
+        const s = pvToSan(m.fenBefore, [m.bestMove], 1);
+        bestSan = s[0] || '';
+      }
+      assessEl.className = `move-assessment q-${q.key}`;
+      assessEl.innerHTML = `
+        <span class="ma-badge">${q.label || 'Good'}${q.symbol ? ` ${q.symbol}` : ''}</span>
+        <span class="ma-detail">
+          ${m.color === 'w' ? 'White' : 'Black'} played <b>${m.san}</b>
+          ${showLoss ? `— lost ${(m.cpLoss / 100).toFixed(1)}${bestSan ? `, best was <b>${bestSan}</b>` : ''}` : ''}
+        </span>
+      `;
     }
 
     function highlightActiveRow() {
@@ -133,7 +225,7 @@ export const analysisScreen = {
           if (m) {
             cell.dataset.ply = String(j + 1);
             cell.classList.add(`q-${m.quality.key}`);
-            cell.innerHTML = `${m.san}<span class="amove-sym">${m.quality.symbol}</span>`;
+            cell.innerHTML = `<span class="amove-san">${m.san}</span><span class="amove-sym">${m.quality.symbol}</span>`;
             cell.addEventListener('click', () => goTo(j + 1));
           } else {
             cell.classList.add('amove-empty');
@@ -146,10 +238,9 @@ export const analysisScreen = {
     }
 
     async function runAnalysis(pgn) {
-      let engine;
       try {
         engine = getEngine();
-      } catch (err) {
+      } catch {
         progressText.textContent = 'Engine failed to load.';
         return;
       }
@@ -194,6 +285,7 @@ export const analysisScreen = {
     wrap.querySelector('[data-nav="flip"]').addEventListener('click', () => {
       orientation = orientation === 'w' ? 'b' : 'w';
       board.setOrientation(orientation);
+      evalBar.setOrientation(orientation);
       goTo(cursor);
     });
     wrap.querySelector('.analyze-btn').addEventListener('click', () => {
@@ -206,14 +298,12 @@ export const analysisScreen = {
     });
     wrap.querySelector('.back-link').addEventListener('click', () => navigate('menu'));
 
-    // Keyboard navigation
     this._onKey = (e) => {
       if (e.key === 'ArrowLeft') goTo(cursor - 1);
       else if (e.key === 'ArrowRight') goTo(cursor + 1);
     };
     window.addEventListener('keydown', this._onKey);
 
-    // If we arrived here from a finished game, pre-load its PGN.
     if (presetPgn) {
       pgnInput.value = presetPgn;
       runAnalysis(presetPgn);
@@ -222,5 +312,28 @@ export const analysisScreen = {
 
   unmount() {
     if (this._onKey) window.removeEventListener('keydown', this._onKey);
+    try {
+      getEngine().stop();
+    } catch {
+      /* engine may not exist */
+    }
   },
 };
+
+// Convert a UCI principal variation into SAN, played from `fen`, capped at
+// `max` plies.
+function pvToSan(fen, uciMoves, max) {
+  const chess = new Chess(fen);
+  const out = [];
+  for (const uci of uciMoves.slice(0, max)) {
+    const move = {
+      from: uci.slice(0, 2),
+      to: uci.slice(2, 4),
+      promotion: uci.length > 4 ? uci.slice(4, 5) : undefined,
+    };
+    const res = chess.move(move);
+    if (!res) break;
+    out.push(res.san);
+  }
+  return out;
+}
