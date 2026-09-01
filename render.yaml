@@ -1,4 +1,5 @@
 # One-click deploy config for Render (https://render.com).
+# In the Render dashboard: New → Blueprint → pick the Acolitq/gambit repo.
 services:
   - type: web
     name: gambit
@@ -6,6 +7,8 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
     envVars:
       - key: NODE_VERSION
         value: 20.11.0
