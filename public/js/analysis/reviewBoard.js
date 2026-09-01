@@ -3,6 +3,7 @@ import { createBoard } from '../ui/board.js';
 import { createEvalBar } from './evalBar.js';
 import { createEvalGraph } from './evalGraph.js';
 import { analyzeGame } from './analyzer.js';
+import { getCachedAnalysis, setCachedAnalysis } from './analysisCache.js';
 import { getEngine } from './engineSingleton.js';
 import { formatEval, numberedLine } from './evalFormat.js';
 
@@ -205,8 +206,34 @@ export function createReviewBoard({ mount }) {
     }
   }
 
+  function display() {
+    progressEl.hidden = true;
+    graph.setSeries(report.evalSeries);
+    renderMoveList();
+    accBlock.hidden = false;
+    q('.acc-white .acc-value').textContent =
+      report.accuracy.w != null ? `${report.accuracy.w}%` : '—';
+    q('.acc-black .acc-value').textContent =
+      report.accuracy.b != null ? `${report.accuracy.b}%` : '—';
+    goTo(0);
+  }
+
   // Run a full-game analysis of `pgn` and display it. Resolves with the report.
+  // Reuses a cached report (per PGN + depth) so a game is only analyzed once.
   async function analyze(pgn, { depth = 12 } = {}) {
+    report = null;
+    cursor = 0;
+    engineLinesEl.innerHTML = '';
+    assessEl.hidden = true;
+
+    // Instant path: reuse a cached report for this exact game + depth.
+    const cached = getCachedAnalysis(pgn, depth);
+    if (cached) {
+      report = cached;
+      display();
+      return report;
+    }
+
     try {
       engine = getEngine();
     } catch {
@@ -214,12 +241,8 @@ export function createReviewBoard({ mount }) {
       progressText.textContent = 'Engine failed to load.';
       throw new Error('Engine failed to load.');
     }
-    report = null;
-    cursor = 0;
     progressEl.hidden = false;
     accBlock.hidden = true;
-    engineLinesEl.innerHTML = '';
-    assessEl.hidden = true;
     progressFill.style.width = '0%';
     progressText.textContent = 'Starting engine…';
 
@@ -237,15 +260,8 @@ export function createReviewBoard({ mount }) {
       throw err;
     }
 
-    progressEl.hidden = true;
-    graph.setSeries(report.evalSeries);
-    renderMoveList();
-    accBlock.hidden = false;
-    q('.acc-white .acc-value').textContent =
-      report.accuracy.w != null ? `${report.accuracy.w}%` : '—';
-    q('.acc-black .acc-value').textContent =
-      report.accuracy.b != null ? `${report.accuracy.b}%` : '—';
-    goTo(0);
+    setCachedAnalysis(pgn, depth, report); // remember for next time
+    display();
     return report;
   }
 
