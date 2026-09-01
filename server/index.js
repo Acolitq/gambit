@@ -14,6 +14,7 @@ import { register, login, logout, me, requireAuth } from './auth.js';
 import {
   listTrackers, createTracker, getTracker, deleteTracker,
   addOpponent, deleteOpponent, importOpponentGames, uploadOpponentGames, opponentReport,
+  listOpponentGames, getGame,
 } from './trackers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,6 +50,8 @@ app.delete('/api/opponents/:id', needDb, requireAuth, wrap(deleteOpponent));
 app.post('/api/opponents/:id/import', needDb, requireAuth, wrap(importOpponentGames));
 app.post('/api/opponents/:id/games', needDb, requireAuth, wrap(uploadOpponentGames));
 app.get('/api/opponents/:id/report', needDb, requireAuth, wrap(opponentReport));
+app.get('/api/opponents/:id/games', needDb, requireAuth, wrap(listOpponentGames));
+app.get('/api/games/:id', needDb, requireAuth, wrap(getGame));
 
 // Opponent scouting proxy. GET /api/scout?platform=chesscom|lichess&username=...
 app.get('/api/scout', async (req, res) => {

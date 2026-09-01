@@ -1,18 +1,35 @@
 import { navigate } from '../router.js';
 import { store } from '../store.js';
 import { LEVELS } from '../engine/bot.js';
+import { NEURAL_LEVELS } from '../engine/neural/neuralEngine.js';
 
 export const setupScreen = {
   mount(root) {
-    let level = store.get('level') || 3;
-    let color = 'w'; // 'w' | 'b' | 'random'
+    let engine = store.get('engineType') || 'classical'; // 'classical' | 'neural'
+    let level = store.get('level') || 3; // classical 1-5
+    let neuralLevel = store.get('neuralLevel') || 2; // neural 1-3
+    let color = 'w';
 
     const wrap = document.createElement('div');
     wrap.className = 'screen setup-screen';
     wrap.innerHTML = `
       <div class="card setup-card">
-        <button class="text-link back-link">← Back</button>
+        <button class="text-link back-link"><i data-lucide="arrow-left"></i> Back</button>
         <h2>New Game vs Computer</h2>
+
+        <div class="field">
+          <label class="field-label">Engine</label>
+          <div class="engine-toggle">
+            <button class="engine-opt" data-engine="classical">
+              <span class="eo-title">Classical</span>
+              <span class="eo-sub">Alpha-beta search</span>
+            </button>
+            <button class="engine-opt" data-engine="neural">
+              <span class="eo-title">Neural · AlphaZero</span>
+              <span class="eo-sub">Self-trained net + MCTS</span>
+            </button>
+          </div>
+        </div>
 
         <div class="field">
           <label class="field-label">Difficulty</label>
@@ -35,21 +52,41 @@ export const setupScreen = {
 
     const pillsEl = wrap.querySelector('.level-pills');
     const captionEl = wrap.querySelector('.level-caption');
+
+    function renderEngine() {
+      for (const b of wrap.querySelectorAll('.engine-opt')) {
+        b.classList.toggle('active', b.dataset.engine === engine);
+      }
+      renderPills();
+    }
     function renderPills() {
       pillsEl.innerHTML = '';
-      for (let n = 1; n <= 5; n++) {
+      const max = engine === 'neural' ? 3 : 5;
+      const cur = engine === 'neural' ? neuralLevel : level;
+      for (let n = 1; n <= max; n++) {
         const b = document.createElement('button');
-        b.className = 'level-pill' + (n === level ? ' active' : '');
+        b.className = 'level-pill' + (n === cur ? ' active' : '');
         b.textContent = String(n);
         b.addEventListener('click', () => {
-          level = n;
+          if (engine === 'neural') neuralLevel = n;
+          else level = n;
           renderPills();
         });
         pillsEl.appendChild(b);
       }
-      captionEl.textContent = `Level ${level} — ${LEVELS[level].label}`;
+      captionEl.textContent =
+        engine === 'neural'
+          ? NEURAL_LEVELS[neuralLevel].label
+          : `Level ${level} — ${LEVELS[level].label}`;
     }
-    renderPills();
+
+    for (const b of wrap.querySelectorAll('.engine-opt')) {
+      b.addEventListener('click', () => {
+        engine = b.dataset.engine;
+        renderEngine();
+      });
+    }
+    renderEngine();
 
     function renderColors() {
       for (const btn of wrap.querySelectorAll('.color-choice')) {
@@ -67,7 +104,13 @@ export const setupScreen = {
     wrap.querySelector('.back-link').addEventListener('click', () => navigate('menu'));
     wrap.querySelector('.start-btn').addEventListener('click', () => {
       const resolved = color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : color;
-      store.set({ mode: 'bot', level, playerColor: resolved });
+      store.set({
+        mode: 'bot',
+        engineType: engine,
+        level,
+        neuralLevel,
+        playerColor: resolved,
+      });
       navigate('game');
     });
 

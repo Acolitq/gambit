@@ -1,12 +1,9 @@
 /* Analysis / study screen. */
 
-/* New shared variants used elsewhere too */
-.btn-secondary {
-  background: var(--secondary);
-  color: #fff;
-}
-.btn-secondary:hover {
-  filter: brightness(1.08);
+/* Eval-bar fixed contrast (navy track, cream fill) */
+:root {
+  --eb-black: #262421;
+  --eb-white: #f1f0ee;
 }
 .menu-card-study .menu-card-icon {
   color: var(--secondary);
@@ -47,14 +44,14 @@
   flex: 1;
   display: flex;
   flex-direction: column-reverse;
-  background: #2b2621;
+  background: var(--eb-black);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .eb-white {
   width: 100%;
-  background: #f3efe6;
+  background: var(--eb-white);
   transition: height var(--dur-slow) var(--ease-standard);
 }
 .eb-label {
@@ -66,14 +63,14 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 10px;
-  font-weight: 700;
-  color: #f3efe6;
+  font-weight: 600;
+  color: var(--eb-white);
   letter-spacing: -0.02em;
 }
 .eval-bar.white-ahead .eb-label {
   top: auto;
   bottom: 5px;
-  color: #211d17;
+  color: var(--eb-black);
 }
 
 /* Engine panel */
@@ -91,7 +88,7 @@
 }
 .engine-title {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-secondary);
@@ -104,7 +101,7 @@
 .move-assessment {
   font-size: 13px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-alt);
   margin-bottom: 8px;
   display: flex;
@@ -112,7 +109,7 @@
   align-items: baseline;
 }
 .ma-badge {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 12px;
   white-space: nowrap;
 }
@@ -132,6 +129,9 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  /* Reserve room for up to 3 lines so the panel below doesn't jump as you
+     step through the game and the engine reports new candidate moves. */
+  min-height: 66px;
 }
 .engine-lines.thinking {
   opacity: 0.75;
@@ -143,13 +143,13 @@
   font-family: var(--font-mono);
   font-size: 12.5px;
   padding: 3px 4px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
 }
 .engine-line:hover {
   background: var(--surface-alt);
 }
 .el-eval {
-  font-weight: 700;
+  font-weight: 600;
   min-width: 44px;
 }
 .el-eval.pos { color: var(--text-primary); }
@@ -166,8 +166,25 @@
   justify-content: center;
 }
 .nav-btn {
-  padding: 8px 14px;
-  font-size: 16px;
+  width: 40px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.nav-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+.nav-btn svg {
+  width: 17px;
+  height: 17px;
+}
+/* Openings "Back"/"Reset" keep their auto width */
+.openings-screen .nav-btn[data-nav="reset"] {
+  width: auto;
+  padding: 0 var(--space-3);
 }
 
 .analysis-side {
@@ -197,7 +214,7 @@
   width: 100%;
   resize: vertical;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-primary);
   font-family: var(--font-mono);
@@ -220,7 +237,7 @@
 .depth-select {
   font-family: var(--font-body);
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-primary);
@@ -237,7 +254,7 @@
 }
 .progress-track {
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--surface-alt);
   overflow: hidden;
 }
@@ -277,7 +294,7 @@
 .acc-value {
   font-family: var(--font-display);
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 600;
 }
 .acc-white .acc-value {
   color: var(--text-primary);
@@ -306,16 +323,16 @@
   fill: var(--surface-alt);
 }
 .eg-area-white {
-  fill: rgba(240, 240, 235, 0.9);
+  fill: rgba(233, 234, 237, 0.9);
 }
 .eg-area-black {
-  fill: rgba(40, 38, 32, 0.85);
+  fill: rgba(23, 24, 27, 0.85);
 }
 :root[data-theme="dark"] .eg-area-white {
-  fill: rgba(230, 226, 216, 0.85);
+  fill: rgba(220, 222, 228, 0.85);
 }
 :root[data-theme="dark"] .eg-area-black {
-  fill: rgba(10, 9, 6, 0.9);
+  fill: rgba(10, 10, 12, 0.92);
 }
 .eg-line {
   stroke: var(--accent);
@@ -359,7 +376,7 @@
   text-align: left;
   background: none;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 4px 8px;
   color: var(--text-primary);
   font-family: var(--font-mono);
@@ -380,7 +397,7 @@
   cursor: default;
 }
 .amove-sym {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 12px;
 }
 .q-best .amove-sym {
@@ -399,7 +416,7 @@
 .q-mistake .amove-san { color: var(--verdict-mistake); }
 .q-blunder .amove-san { color: var(--verdict-blunder); }
 
-@media (max-width: 960px) {
+@media (max-width: 720px) {
   .analysis-screen {
     flex-direction: column;
     align-items: center;
@@ -408,3 +425,21 @@
     width: min(640px, 90vw);
   }
 }
+
+/* Right-hand column order: engine + moves up top (like chess.com), the PGN
+   loader and progress drop to the bottom. */
+.analysis-side .analysis-header { order: 0; }
+.analysis-side .engine-panel { order: 1; }
+.analysis-side .accuracy-block { order: 2; }
+.analysis-side .eval-graph-host { order: 3; }
+.analysis-side .analysis-move-list { order: 4; }
+.analysis-side .analysis-progress { order: 5; }
+.analysis-side .import-block { order: 6; }
+
+/* Repertoire right column: engine first, then the opening name + continuations. */
+.openings-side .analysis-header { order: 0; }
+.openings-side .engine-panel { order: 1; }
+.openings-side .current-opening { order: 2; }
+.openings-side .continuations { order: 3; }
+.openings-side .opening-info { order: 4; }
+.openings-side .basics { order: 5; }

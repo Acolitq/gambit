@@ -1,6 +1,8 @@
 import { Chess } from 'chess.js';
 import { navigate } from '../router.js';
 import { createBoard } from '../ui/board.js';
+import { getEngine } from '../analysis/engineSingleton.js';
+import { formatEval, numberedLine } from '../analysis/evalFormat.js';
 
 // Openings trainer: an explore board where every legal move is allowed, the
 // current position is named live from the lichess openings dataset, popular
@@ -14,25 +16,41 @@ export const openingsScreen = {
       <div class="openings-main">
         <div class="board-host"></div>
         <div class="review-controls">
-          <button class="btn btn-ghost nav-btn" data-nav="back" title="Back one move (←)">◀ Back</button>
+          <button class="btn btn-ghost nav-btn" data-nav="back" title="Back one move (←)" aria-label="Back one move"><i data-lucide="chevron-left"></i></button>
           <button class="btn btn-ghost nav-btn" data-nav="reset" title="Reset">Reset</button>
-          <button class="btn btn-ghost nav-btn" data-nav="flip" title="Flip">⇅</button>
+          <button class="btn btn-ghost nav-btn" data-nav="flip" title="Flip" aria-label="Flip board"><i data-lucide="arrow-up-down"></i></button>
         </div>
       </div>
       <aside class="openings-side">
         <div class="analysis-header">
           <h2>Openings</h2>
-          <button class="text-link back-link">← Menu</button>
+          <button class="text-link back-link"><i data-lucide="arrow-left"></i> Menu</button>
         </div>
         <div class="current-opening">
           <div class="co-eco">—</div>
           <div class="co-name">Start position</div>
           <div class="co-moves"></div>
         </div>
+        <div class="engine-panel">
+          <div class="engine-head">
+            <span class="engine-title">Engine</span>
+            <span class="engine-depth"></span>
+          </div>
+          <div class="engine-lines"></div>
+        </div>
         <div class="continuations">
           <h3 class="side-h3">Continuations</h3>
           <div class="cont-list"></div>
         </div>
+        <div class="opening-info">
+          <h3 class="side-h3">About this opening</h3>
+          <p class="oi-desc">Play a move to see the opening named, a short description, and its main line.</p>
+          <div class="oi-mainline-wrap" hidden>
+            <div class="oi-label">Main line</div>
+            <div class="oi-mainline mono"></div>
+          </div>
+        </div>
+
         <div class="basics">
           <h3 class="side-h3">Common openings</h3>
           <div class="basics-grid"></div>
@@ -70,6 +88,44 @@ export const openingsScreen = {
         return chess.moves({ square: sq, verbose: true }).map((m) => m.to);
       },
     });
+    // Show the starting pieces immediately.
+    board.setPosition(chess.fen());
+
+    // Live engine for the current position (eval + best lines).
+    const engineDepthEl = wrap.querySelector('.engine-depth');
+    const engineLinesEl = wrap.querySelector('.engine-lines');
+    let engine = null;
+    try {
+      engine = getEngine();
+    } catch {
+      engine = null;
+    }
+    function runEngine(fen) {
+      if (!engine) return;
+      engineLinesEl.classList.add('thinking');
+      engine
+        .analyze(fen, { depth: 18, multiPv: 2, onUpdate: (lines) => renderEngineLines(lines, fen) })
+        .then((lines) => {
+          engineLinesEl.classList.remove('thinking');
+          renderEngineLines(lines, fen);
+        });
+    }
+    function renderEngineLines(lines, fen) {
+      if (!lines.length) return;
+      engineDepthEl.textContent = `depth ${lines[0].depth}`;
+      engineLinesEl.innerHTML = '';
+      for (const line of lines) {
+        const sans = pvToSan(fen, line.pv, 6);
+        const row = document.createElement('div');
+        row.className = 'engine-line';
+        const positive = (line.mate ?? line.scoreCp ?? 0) >= 0;
+        row.innerHTML = `
+          <span class="el-eval ${positive ? 'pos' : 'neg'}">${formatEval({ scoreCp: line.scoreCp, mate: line.mate })}</span>
+          <span class="el-moves">${numberedLine(fen, sans)}</span>
+        `;
+        engineLinesEl.appendChild(row);
+      }
+    }
 
     function play(move) {
       const res = chess.move(move);
@@ -126,11 +182,25 @@ export const openingsScreen = {
         .slice(0, 10);
     }
 
+    const oiDesc = wrap.querySelector('.oi-desc');
+    const oiMlWrap = wrap.querySelector('.oi-mainline-wrap');
+    const oiMl = wrap.querySelector('.oi-mainline');
+
     function update() {
       const co = currentOpening();
       wrap.querySelector('.co-eco').textContent = co ? co.eco : '—';
       wrap.querySelector('.co-name').textContent = co ? co.name : 'Start position';
       wrap.querySelector('.co-moves').textContent = formatMoves(sanHistory);
+
+      // Description + main line for the current opening.
+      if (co) {
+        oiDesc.textContent = describeOpening(co);
+        oiMl.textContent = numberedLine(START_FEN_FULL, co.san);
+        oiMlWrap.hidden = false;
+      } else {
+        oiDesc.textContent = 'Play a move to see the opening named, a short description, and its main line.';
+        oiMlWrap.hidden = true;
+      }
 
       const contEl = wrap.querySelector('.cont-list');
       contEl.innerHTML = '';
@@ -145,6 +215,8 @@ export const openingsScreen = {
         btn.addEventListener('click', () => play(sanToMove(c.move)));
         contEl.appendChild(btn);
       }
+
+      runEngine(chess.fen());
     }
 
     // Convert a SAN string into a move object chess.js can apply from here.
@@ -192,8 +264,64 @@ export const openingsScreen = {
 
   unmount() {
     if (this._onKey) window.removeEventListener('keydown', this._onKey);
+    try {
+      getEngine().stop();
+    } catch {
+      /* engine may not exist */
+    }
   },
 };
+
+const START_FEN_FULL = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+// Short, factual blurbs for the most common openings, matched on the opening
+// name. Anything not listed gets a sensible generated description.
+const DESCRIPTIONS = [
+  ['sicilian', "Black meets 1.e4 with 1...c5, fighting for the centre asymmetrically. It's the most popular and most combative answer to e4, giving sharp, unbalanced middlegames."],
+  ['french', 'After 1.e4 e6 Black builds a solid pawn chain and strikes with ...d5. Reliable and strategic, though the light-squared bishop can be hard to free.'],
+  ['caro-kann', '1.e4 c6 prepares ...d5 with a rock-solid structure — a sound, low-risk defence that keeps the pieces coordinated.'],
+  ['ruy lopez', '1.e4 e5 2.Nf3 Nc6 3.Bb5 pressures the knight guarding e5. One of the oldest and deepest openings, full of long-term strategic ideas.'],
+  ['spanish', '1.e4 e5 2.Nf3 Nc6 3.Bb5 pressures the knight guarding e5. One of the oldest and deepest openings, full of long-term strategic ideas.'],
+  ['italian', '1.e4 e5 2.Nf3 Nc6 3.Bc4 eyes f7 and develops quickly. It ranges from quiet manoeuvring to sharp, direct attacks.'],
+  ["queen's gambit", "1.d4 d5 2.c4 offers a pawn to pull Black's centre aside. Classical and strategically rich, whether the gambit is accepted or declined."],
+  ['king’s indian', 'Black lets White build a big centre, then counter-attacks with ...e5 and a kingside pawn storm. Dynamic and double-edged.'],
+  ["king's indian", 'Black lets White build a big centre, then counter-attacks with ...e5 and a kingside pawn storm. Dynamic and double-edged.'],
+  ['nimzo-indian', '1.d4 Nf6 2.c4 e6 3.Nc3 Bb4 pins the knight and fights for the centre with pieces. Sound and flexible at every level.'],
+  ['english', '1.c4 controls d5 from the flank and often transposes into rich strategic play. Flexible and less forcing than 1.e4.'],
+  ['london', 'White plays an early Bf4 and sets up a solid, easy-to-learn system that works against almost anything Black tries.'],
+  ['scandinavian', '1.e4 d5 challenges the centre at once. Straightforward to learn, though Black often spends a tempo or two with the queen.'],
+  ['pirc', 'Black fianchettoes and lets White occupy the centre, aiming to undermine it later. Hypermodern and flexible.'],
+  ['modern', 'Black fianchettoes and lets White occupy the centre, aiming to undermine it later. Hypermodern and flexible.'],
+  ['scotch', '1.e4 e5 2.Nf3 Nc6 3.d4 opens the centre early for fast piece play and clear plans.'],
+  ['vienna', '1.e4 e5 2.Nc3 keeps options open, often preparing f4 for a quick kingside push.'],
+  ['slav', '1.d4 d5 2.c4 c6 supports the centre without shutting in the light-squared bishop — solid and dependable.'],
+  ['grünfeld', 'Black lets White build a broad centre, then blasts it with ...d5 and piece pressure. Sharp and theory-heavy.'],
+  ['grunfeld', 'Black lets White build a broad centre, then blasts it with ...d5 and piece pressure. Sharp and theory-heavy.'],
+];
+
+function describeOpening(o) {
+  const name = (o.name || '').toLowerCase();
+  for (const [key, text] of DESCRIPTIONS) {
+    if (name.includes(key)) return text;
+  }
+  return `The ${o.name} (${o.eco}) arises after ${numberedLine(START_FEN_FULL, o.san)}. From here both sides follow well-mapped plans — try the continuations above to see how the main lines branch.`;
+}
+
+// Convert a UCI principal variation into SAN, played from `fen`, capped at `max`.
+function pvToSan(fen, uciMoves, max) {
+  const chess = new Chess(fen);
+  const out = [];
+  for (const uci of (uciMoves || []).slice(0, max)) {
+    const res = chess.move({
+      from: uci.slice(0, 2),
+      to: uci.slice(2, 4),
+      promotion: uci.length > 4 ? uci.slice(4, 5) : undefined,
+    });
+    if (!res) break;
+    out.push(res.san);
+  }
+  return out;
+}
 
 function formatMoves(sanArr) {
   let out = '';

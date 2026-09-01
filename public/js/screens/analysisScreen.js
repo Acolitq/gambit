@@ -6,7 +6,7 @@ import { createEvalGraph } from '../analysis/evalGraph.js';
 import { createEvalBar } from '../analysis/evalBar.js';
 import { analyzeGame } from '../analysis/analyzer.js';
 import { getEngine } from '../analysis/engineSingleton.js';
-import { formatEval } from '../analysis/evalFormat.js';
+import { formatEval, numberedLine } from '../analysis/evalFormat.js';
 
 // Live engine settings for the interactive panel.
 const LIVE_DEPTH = 22;
@@ -37,17 +37,17 @@ export const analysisScreen = {
           <div class="board-host"></div>
         </div>
         <div class="review-controls">
-          <button class="btn btn-ghost nav-btn" data-nav="start" title="Start">⏮</button>
-          <button class="btn btn-ghost nav-btn" data-nav="prev" title="Previous (←)">◀</button>
-          <button class="btn btn-ghost nav-btn" data-nav="next" title="Next (→)">▶</button>
-          <button class="btn btn-ghost nav-btn" data-nav="end" title="End">⏭</button>
-          <button class="btn btn-ghost nav-btn" data-nav="flip" title="Flip board">⇅</button>
+          <button class="btn btn-ghost nav-btn" data-nav="start" title="Start" aria-label="First move"><i data-lucide="chevrons-left"></i></button>
+          <button class="btn btn-ghost nav-btn" data-nav="prev" title="Previous (←)" aria-label="Previous move"><i data-lucide="chevron-left"></i></button>
+          <button class="btn btn-ghost nav-btn" data-nav="next" title="Next (→)" aria-label="Next move"><i data-lucide="chevron-right"></i></button>
+          <button class="btn btn-ghost nav-btn" data-nav="end" title="End" aria-label="Last move"><i data-lucide="chevrons-right"></i></button>
+          <button class="btn btn-ghost nav-btn" data-nav="flip" title="Flip board" aria-label="Flip board"><i data-lucide="arrow-up-down"></i></button>
         </div>
       </div>
       <aside class="analysis-side">
         <div class="analysis-header">
           <h2>Analysis</h2>
-          <button class="text-link back-link">← Menu</button>
+          <button class="text-link back-link"><i data-lucide="arrow-left"></i> Menu</button>
         </div>
 
         <div class="import-block">
@@ -171,7 +171,7 @@ export const analysisScreen = {
         const positive = (line.mate ?? line.scoreCp ?? 0) >= 0;
         row.innerHTML = `
           <span class="el-eval ${positive ? 'pos' : 'neg'}">${evalStr}</span>
-          <span class="el-moves">${sans.join(' ')}</span>
+          <span class="el-moves">${numberedLine(fen, sans)}</span>
         `;
         engineLinesEl.appendChild(row);
       }
@@ -307,6 +307,19 @@ export const analysisScreen = {
     if (presetPgn) {
       pgnInput.value = presetPgn;
       runAnalysis(presetPgn);
+    } else {
+      // Default state: a full board in the starting position with the engine
+      // already thinking, so the lab is never empty.
+      try {
+        engine = getEngine();
+        const startFen = new Chess().fen();
+        board.setPosition(startFen);
+        board.highlightLastMove(null, null);
+        evalBar.setEval({ scoreCp: 0 });
+        runLiveEngine(startFen);
+      } catch {
+        /* engine unavailable */
+      }
     }
   },
 

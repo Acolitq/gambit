@@ -8,3 +8,7 @@ coverage/
 *.log
 .vscode/
 .idea/
+ml/.venv/
+ml/data/
+ml/checkpoints/
+*.pt

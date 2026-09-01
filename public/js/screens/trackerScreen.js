@@ -16,7 +16,7 @@ export const trackerScreen = {
     wrap.innerHTML = `
       <div class="scout-head">
         <div>
-          <button class="text-link back-link">← All trackers</button>
+          <button class="text-link back-link"><i data-lucide="arrow-left"></i> All trackers</button>
           <h1 class="tk-title">Tracker</h1>
           <p class="tk-sub"></p>
         </div>
@@ -85,13 +85,16 @@ export const trackerScreen = {
         return;
       }
       listEl.innerHTML = '';
-      for (const o of opponents) listEl.appendChild(opponentCard(o, load));
+      for (const o of opponents) listEl.appendChild(opponentCard(o, load, trackerId));
       refreshIcons();
     }
+
+    // Fetch the tracker and its opponents on open.
+    load();
   },
 };
 
-function opponentCard(o, reload) {
+function opponentCard(o, reload, trackerId) {
   const card = document.createElement('div');
   card.className = 'opponent-card card';
   const handles = [
@@ -103,14 +106,17 @@ function opponentCard(o, reload) {
   card.innerHTML = `
     <div class="oc-head">
       <div>
-        <div class="oc-name">${escapeHtml(o.name)}</div>
+        <button class="oc-name oc-open" title="Review ${escapeHtml(o.name)}'s games">${escapeHtml(o.name)}</button>
         <div class="oc-handles">${escapeHtml(handles) || 'No accounts linked'}</div>
       </div>
       <div class="oc-actions">
         <span class="oc-count mono">${o.game_count} game${o.game_count === 1 ? '' : 's'}</span>
         <button class="btn btn-secondary oc-import">Import online</button>
         <button class="btn btn-secondary oc-upload">Upload PGN</button>
-        <button class="btn btn-primary oc-report-btn">Prep report</button>
+        <button class="btn btn-secondary oc-report-btn">Prep report</button>
+        <button class="btn btn-primary oc-games-btn" ${o.game_count ? '' : 'disabled title="No games yet"'}>
+          <i data-lucide="swords"></i> Review games
+        </button>
         <button class="btn btn-ghost oc-remove" title="Remove"><i data-lucide="trash-2"></i></button>
       </div>
     </div>
@@ -125,6 +131,11 @@ function opponentCard(o, reload) {
   const statusEl = card.querySelector('.oc-status');
   const reportEl = card.querySelector('.oc-report-panel');
   const uploadBox = card.querySelector('.oc-upload-box');
+
+  const openReview = () => navigate('opponent', { id: o.id, trackerId });
+  card.querySelector('.oc-open').addEventListener('click', openReview);
+  const gamesBtn = card.querySelector('.oc-games-btn');
+  if (o.game_count) gamesBtn.addEventListener('click', openReview);
 
   card.querySelector('.oc-remove').addEventListener('click', async () => {
     if (!confirm(`Remove ${o.name}?`)) return;

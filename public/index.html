@@ -3,17 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gambit — Play Chess</title>
+    <title>Gambit — Play, review & scout chess</title>
     <meta
       name="description"
-      content="A clean, simple chess app. Play against bots at five levels or get matched with a random opponent online."
+      content="Gambit is a chess desk for tournament players: play bots or online, review your games with Stockfish, and scout opponents from their real games."
     />
+    <link rel="icon" href="/assets/pieces/cburnett/wN.svg" type="image/svg+xml" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap"
-      rel="stylesheet"
+    <!-- Social preview -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Gambit — Play, review & scout chess" />
+    <meta
+      property="og:description"
+      content="Play, review your games with a real engine, and scout your next opponent from their real games."
+    />
+    <meta property="og:image" content="/assets/pieces/cburnett/wN.svg" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Gambit — Play, review & scout chess" />
+    <meta
+      name="twitter:description"
+      content="A chess desk for tournament players: play, engine review, and opponent scouting."
     />
 
     <link rel="stylesheet" href="/styles/base.css" />
@@ -34,17 +43,34 @@
     </script>
   </head>
   <body>
-    <header class="topbar">
-      <a class="topbar-brand" href="#/menu">Gambit</a>
-      <div class="topbar-right">
-        <div id="account" class="account"></div>
-        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
-          <i data-lucide="moon"></i>
-        </button>
-      </div>
-    </header>
+    <div class="app-shell">
+      <!-- Left rail (Tournament desk). Nav + account are rendered in main.js. -->
+      <aside class="sidebar" id="sidebar" data-open="false">
+        <a class="sb-brand" href="#/menu">
+          <span class="sb-logo"><img src="/assets/pieces/cburnett/wN.svg" alt="" /></span>
+          <span class="sb-word">
+            <span class="sb-word-main tourney-display">Gambit</span>
+            <span class="sb-word-sub">Tournament desk</span>
+          </span>
+        </a>
+        <div class="sb-section-label">Prepare</div>
+        <nav class="sb-nav" id="sidebar-nav"></nav>
+        <div class="sb-foot" id="sidebar-foot"></div>
+      </aside>
 
-    <main id="app"></main>
+      <button class="sb-scrim" id="sidebar-scrim" aria-label="Close menu" hidden></button>
+
+      <div class="app-main">
+        <header class="topbar">
+          <button class="sb-toggle" id="sidebar-toggle" aria-label="Open navigation">
+            <i data-lucide="menu"></i>
+          </button>
+          <a class="topbar-brand tourney-display" href="#/menu">Gambit</a>
+          <div class="topbar-spacer"></div>
+        </header>
+        <main id="app"></main>
+      </div>
+    </div>
 
     <!-- Lucide icons (UMD, sets window.lucide); createIcons() is called after each screen render. -->
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.462.0/dist/umd/lucide.js"></script>

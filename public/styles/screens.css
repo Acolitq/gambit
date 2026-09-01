@@ -12,24 +12,27 @@
   min-height: 68vh;
 }
 .home-eyebrow {
-  font-size: 12px;
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.19em;
   color: var(--accent);
   margin: 0 0 var(--space-3);
 }
 .home-title {
-  font-size: 44px;
-  line-height: 1.05;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: 72px;
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-3);
 }
 .home-tagline {
-  font-size: 17px;
+  font-size: 16px;
   color: var(--text-secondary);
-  max-width: 46ch;
+  max-width: 42ch;
   margin: 0 0 var(--space-6);
   text-wrap: pretty;
 }
@@ -80,7 +83,7 @@
   gap: 2px;
 }
 .home-card-title {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 15px;
 }
 .home-card-sub {
@@ -104,9 +107,8 @@
 .home-board-frame {
   position: relative;
   width: min(460px, 40vw);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-xs);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   overflow: hidden;
 }
 .home-footer {
@@ -157,7 +159,7 @@
   background-repeat: no-repeat;
 }
 .ghost-board .sb-piece {
-  opacity: 0.07;
+  opacity: 0.1;
   filter: grayscale(1);
   animation: ghostIn 500ms var(--ease-standard) both;
 }
@@ -172,8 +174,8 @@
     animation: none;
   }
 }
-:root[data-theme="dark"] .ghost-board .sb-piece {
-  opacity: 0.1;
+:root[data-theme="light"] .ghost-board .sb-piece {
+  opacity: 0.07;
 }
 
 /* ---- Setup ---- */
@@ -190,13 +192,42 @@
 }
 .setup-card h2 {
   font-size: 24px;
-  font-weight: 700;
-  margin: 8px 0 24px;
+  font-weight: 600;
+  margin: 44px 0 24px;
 }
 .back-link {
   position: absolute;
   top: 20px;
   left: 16px;
+}
+.engine-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+.engine-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: var(--space-3);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  transition: border-color var(--dur-base) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard);
+}
+.engine-opt.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-tint);
+}
+.eo-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+.eo-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 .level-pills {
   display: flex;
@@ -215,7 +246,7 @@
 }
 .level-pill.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-color: var(--accent);
   transform: scale(1.05);
 }
@@ -246,22 +277,22 @@
 .color-choice.active {
   border-color: var(--accent);
   color: var(--text-primary);
-  box-shadow: 0 0 0 4px rgba(181, 101, 29, 0.15);
+  box-shadow: 0 0 0 4px var(--accent-tint);
 }
 .swatch {
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
 }
 .swatch-white {
-  background: #f4f1ea;
+  background: #e9dfc4;
 }
 .swatch-black {
-  background: #2a2620;
+  background: #263b46;
 }
 .swatch-random {
-  background: linear-gradient(135deg, #f4f1ea 50%, #2a2620 50%);
+  background: linear-gradient(135deg, #e9dfc4 50%, #263b46 50%);
 }
 
 /* ---- Queue ---- */
@@ -350,10 +381,14 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--surface-alt);
+  background: var(--accent);
+  color: var(--on-accent);
   display: grid;
   place-items: center;
-  font-size: 18px;
+}
+.avatar svg {
+  width: 17px;
+  height: 17px;
 }
 .player-name {
   font-weight: 600;
@@ -395,11 +430,11 @@
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
   padding: 4px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .clock.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .game-side {
@@ -481,7 +516,7 @@
 }
 .result-title {
   font-size: 32px;
-  font-weight: 800;
+  font-weight: 600;
 }
 .result-card.tone-success .result-title {
   color: var(--success);

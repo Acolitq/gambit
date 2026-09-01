@@ -6,6 +6,8 @@ import { createMoveList } from '../ui/moveList.js';
 import { createStatusBar } from '../ui/statusBar.js';
 import { createGame } from '../game/gameController.js';
 import { LEVELS } from '../engine/bot.js';
+import { NEURAL_LEVELS } from '../engine/neural/neuralEngine.js';
+import { getNeuralEngine } from '../engine/neural/browserSession.js';
 
 const VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9 };
 const pieceUrl = (color, type) => `/assets/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
@@ -15,6 +17,8 @@ export const gameScreen = {
     const mode = store.get('mode');
     const playerColor = store.get('playerColor') || 'w';
     const level = store.get('level') || 3;
+    const engineType = store.get('engineType') || 'classical';
+    const neuralLevel = store.get('neuralLevel') || 2;
     const gameId = store.get('gameId');
     const socket = mode === 'online' ? getSocket() : null;
 
@@ -23,7 +27,12 @@ export const gameScreen = {
       return;
     }
 
-    const opponentName = mode === 'bot' ? `Computer · Lv ${level} ${LEVELS[level].label}` : 'Opponent';
+    const opponentName =
+      mode !== 'bot'
+        ? 'Opponent'
+        : engineType === 'neural'
+          ? NEURAL_LEVELS[neuralLevel].label
+          : `Computer · Lv ${level} ${LEVELS[level].label}`;
 
     const wrap = document.createElement('div');
     wrap.className = 'screen game-screen';
@@ -54,8 +63,10 @@ export const gameScreen = {
     const bottomPanel = wrap.querySelector('[data-slot="bottom"]');
     topPanel.querySelector('.player-name').textContent = opponentName;
     bottomPanel.querySelector('.player-name').textContent = 'You';
-    topPanel.querySelector('.avatar').textContent = mode === 'bot' ? '🤖' : '?';
-    bottomPanel.querySelector('.avatar').textContent = '🙂';
+    topPanel.querySelector('.avatar').innerHTML =
+      mode === 'bot' ? '<i data-lucide="cpu"></i>' : '<i data-lucide="user"></i>';
+    bottomPanel.querySelector('.avatar').innerHTML = '<i data-lucide="user"></i>';
+    if (window.lucide) window.lucide.createIcons();
 
     const boardHost = wrap.querySelector('.board-host');
     const board = createBoard({
@@ -88,6 +99,17 @@ export const gameScreen = {
       }
     }
 
+    // Neural bot: lazy-load the ONNX model on first move, then run MCTS.
+    let neuralBotMove;
+    if (mode === 'bot' && engineType === 'neural') {
+      const sims = NEURAL_LEVELS[neuralLevel].sims;
+      neuralBotMove = async (fen) => {
+        const engine = await getNeuralEngine((msg) => statusBar.set(msg, 'neutral'));
+        statusBar.set('Neural engine is thinking…', 'neutral');
+        return engine.chooseMove(fen, sims);
+      };
+    }
+
     const controller = createGame({
       mode,
       playerColor,
@@ -97,6 +119,7 @@ export const gameScreen = {
       board,
       moveList,
       statusBar,
+      ...(neuralBotMove ? { botMove: neuralBotMove } : {}),
       onCaptured: renderCaptured,
       onGameOver: (payload) => {
         stopClock();

@@ -19,7 +19,7 @@ export const trackersScreen = {
           <h1>Tournament Trackers</h1>
           <p class="scout-tagline">A prep board for each event — add opponents and everything you need to know about them.</p>
         </div>
-        <button class="text-link back-link">← Menu</button>
+        <button class="text-link back-link"><i data-lucide="arrow-left"></i> Menu</button>
       </div>
 
       <form class="tracker-create card">

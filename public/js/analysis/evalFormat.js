@@ -18,6 +18,24 @@ export function formatEval({ scoreCp, mate }) {
   return '0.0';
 }
 
+// Format a principal variation (array of SAN strings) with move numbers, the way
+// chess.com/lichess show engine lines, e.g. "4. c5 Bxa6 5. Bb7". Numbering is
+// derived from the FEN the line is played from (side to move + fullmove number).
+export function numberedLine(fen, sans) {
+  const parts = String(fen).split(' ');
+  let n = Number(parts[5]) || 1;
+  let white = parts[1] !== 'b';
+  const out = [];
+  for (let i = 0; i < sans.length; i++) {
+    if (white) out.push(`${n}.`);
+    else if (i === 0) out.push(`${n}...`);
+    out.push(sans[i]);
+    if (!white) n += 1;
+    white = !white;
+  }
+  return out.join(' ');
+}
+
 // Same value but always from the given side's perspective (for engine lines
 // shown to the side to move). Positive = good for that side.
 export function formatEvalFor(line, sideToMove) {

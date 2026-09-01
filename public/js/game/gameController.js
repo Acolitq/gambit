@@ -16,6 +16,9 @@ export function createGame(opts) {
     onCaptured = () => {},
     onClock = () => {},
     onGameOver = () => {},
+    // Async bot-move provider. Defaults to the classical engine; the neural
+    // engine injects its own. Receives the FEN, returns { from, to, promotion }.
+    botMove = (fen) => Promise.resolve(chooseMove(fen, level)),
   } = opts;
 
   const chess = new Chess();
@@ -117,10 +120,19 @@ export function createGame(opts) {
 
   // --- Bot move ---
   function thinkAndMove() {
-    // Yield a frame so the "thinking" state paints before we block on search.
-    setTimeout(() => {
+    // Yield a frame so the "thinking" state paints before we search. botMove is
+    // async (the neural engine loads a model and runs MCTS off the main path).
+    setTimeout(async () => {
       if (over) return;
-      const move = chooseMove(chess.fen(), level);
+      let move;
+      try {
+        move = await botMove(chess.fen());
+      } catch (err) {
+        statusBar.set('Engine error — playing a legal move.', 'danger');
+        const legal = chess.moves({ verbose: true });
+        move = legal.length ? { from: legal[0].from, to: legal[0].to, promotion: legal[0].promotion } : null;
+      }
+      if (over) return;
       if (!move) {
         finishIfOver();
         return;
@@ -131,7 +143,7 @@ export function createGame(opts) {
       refresh();
       board.setInteractive(true);
       finishIfOver();
-    }, 220);
+    }, 50);
   }
 
   // --- Remote (online) move from the server ---

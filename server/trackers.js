@@ -18,6 +18,16 @@ async function ownOpponent(userId, opponentId) {
   );
   return rows[0] || null;
 }
+async function ownGame(userId, gameId) {
+  const { rows } = await query(
+    `SELECT g.* FROM games g
+     JOIN opponents o ON o.id = g.opponent_id
+     JOIN trackers t ON t.id = o.tracker_id
+     WHERE g.id = $1 AND t.user_id = $2`,
+    [gameId, userId],
+  );
+  return rows[0] || null;
+}
 
 // --- Trackers ---
 export async function listTrackers(req, res) {
@@ -147,6 +157,29 @@ export async function uploadOpponentGames(req, res) {
     imported += 1;
   }
   res.json({ imported });
+}
+
+// --- Games: list an opponent's stored games, and fetch one for board review ---
+export async function listOpponentGames(req, res) {
+  const opp = await ownOpponent(req.user.id, req.params.id);
+  if (!opp) return res.status(404).json({ error: 'Opponent not found.' });
+  const { rows } = await query(
+    `SELECT id, white, black, result, opp_color, opp_result, opening, time_class,
+            played_at, url, source
+     FROM games WHERE opponent_id = $1
+     ORDER BY played_at DESC NULLS LAST, id DESC`,
+    [opp.id],
+  );
+  res.json({
+    opponent: { id: opp.id, name: opp.name, tracker_id: opp.tracker_id },
+    games: rows,
+  });
+}
+
+export async function getGame(req, res) {
+  const game = await ownGame(req.user.id, req.params.id);
+  if (!game) return res.status(404).json({ error: 'Game not found.' });
+  res.json({ game });
 }
 
 // --- Prep report / playstyle summary ---

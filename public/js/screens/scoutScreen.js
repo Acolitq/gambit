@@ -17,7 +17,7 @@ export const scoutScreen = {
           <h1>Scout an Opponent</h1>
           <p class="scout-tagline">Know what they play before you sit down across the board.</p>
         </div>
-        <button class="text-link back-link">← Menu</button>
+        <button class="text-link back-link"><i data-lucide="arrow-left"></i> Menu</button>
       </div>
 
       <div class="scout-tabs">
@@ -103,7 +103,7 @@ function renderOnline(resultEl, d) {
         ${d.avatar ? `<img class="dossier-avatar" src="${d.avatar}" alt="" />` : '<span class="dossier-avatar placeholder"><i data-lucide="user"></i></span>'}
         <div>
           <div class="dossier-name">${d.title ? `<span class="title-badge">${d.title}</span>` : ''}${escapeHtml(d.username)}</div>
-          <a class="dossier-link" href="${d.url}" target="_blank" rel="noopener">on ${d.platform === 'lichess' ? 'Lichess' : 'Chess.com'} ↗</a>
+          <a class="dossier-link" href="${d.url}" target="_blank" rel="noopener">on ${d.platform === 'lichess' ? 'Lichess' : 'Chess.com'} <i data-lucide="arrow-up-right"></i></a>
         </div>
       </div>
       <div class="dossier-record">
@@ -301,7 +301,7 @@ function mountOtb(panel) {
         <span>Game moves aren't available by name from public federation data — use the links below to browse this player's games.</span>
       </div>
       <div class="otb-links">
-        ${p.links.map((l) => `<a class="btn btn-secondary" href="${l.url}" target="_blank" rel="noopener">${escapeHtml(l.label)} ↗</a>`).join('')}
+        ${p.links.map((l) => `<a class="btn btn-secondary" href="${l.url}" target="_blank" rel="noopener">${escapeHtml(l.label)} <i data-lucide="arrow-up-right"></i></a>`).join('')}
       </div>
     `;
     refreshIcons();

@@ -30,7 +30,7 @@
   border: none;
   padding: var(--space-3) 0;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-tertiary);
   position: relative;
   transition: color var(--dur-base) var(--ease-standard);
@@ -49,7 +49,7 @@
   bottom: -1px;
   height: 2px;
   background: var(--accent);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 /* OTB */
@@ -100,7 +100,7 @@
   gap: var(--space-2);
 }
 .cand-name {
-  font-weight: 700;
+  font-weight: 600;
 }
 .cand-meta {
   font-size: 12px;
@@ -138,17 +138,17 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-tertiary);
-  font-weight: 700;
+  font-weight: 600;
 }
 .rc-value {
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 600;
   margin: 4px 0 2px;
 }
 .rc-extra {
   font-size: 12px;
   color: var(--accent);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* Sparkline */
@@ -184,7 +184,7 @@
 }
 .spark-last {
   color: var(--accent);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* Tournament history */
@@ -220,7 +220,7 @@
 }
 .tr-change {
   text-align: right;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-tertiary);
 }
 .tr-change.up {
@@ -291,7 +291,7 @@
 }
 .plat-btn.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .scout-input {
   flex: 1;
@@ -314,7 +314,7 @@
   color: var(--text-secondary);
 }
 .scout-error {
-  background: rgba(179, 58, 58, 0.1);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
 }
 
@@ -337,7 +337,7 @@
 .dossier-avatar {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   object-fit: cover;
   background: var(--surface-alt);
 }
@@ -349,7 +349,7 @@
 }
 .dossier-name {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 600;
   font-size: 20px;
   display: flex;
   align-items: center;
@@ -357,11 +357,11 @@
 }
 .title-badge {
   background: var(--danger);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 6px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   letter-spacing: 0.03em;
 }
 .dossier-link {
@@ -436,7 +436,7 @@
 .op-bar {
   display: flex;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
   margin: 4px 0 3px;
   background: var(--surface-alt);
@@ -487,13 +487,13 @@
   flex-shrink: 0;
 }
 .rg-white {
-  background: #f4f1ea;
+  background: #e9dfc4;
 }
 .rg-black {
-  background: #2a2620;
+  background: #263b46;
 }
 .rg-result {
-  font-weight: 700;
+  font-weight: 600;
   font-family: var(--font-mono);
   width: 16px;
 }
@@ -565,7 +565,7 @@
 }
 .co-name {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 18px;
   margin: 2px 0 8px;
 }
@@ -589,7 +589,7 @@
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
   cursor: pointer;
   transition: border-color 120ms ease, background-color 120ms ease;
@@ -622,7 +622,7 @@
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
   cursor: pointer;
   transition: border-color 120ms ease;
@@ -640,7 +640,7 @@
   font-weight: 500;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 720px) {
   .openings-screen {
     flex-direction: column;
     align-items: center;
@@ -651,4 +651,32 @@
   .dossier-cols {
     grid-template-columns: 1fr;
   }
+}
+
+/* Openings — about / description + main line */
+.opening-info {
+  margin-top: var(--space-2);
+}
+.oi-desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-3);
+}
+.oi-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-1);
+}
+.oi-mainline {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
 }

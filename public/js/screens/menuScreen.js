@@ -20,12 +20,8 @@ export const menuScreen = {
     wrap.innerHTML = `
       <div class="home-hero">
         <div class="home-content">
-          <p class="home-eyebrow">Play · Analyze · Prepare</p>
-          <h1 class="home-title">Prepare like it matters.</h1>
-          <p class="home-tagline">
-            A clean place to play chess, review your games with a real engine,
-            and scout your next opponent before you sit down across the board.
-          </p>
+          <h1 class="home-title">Gambit</h1>
+          <p class="home-tagline">Play, review your games with a real engine, and scout your next opponent.</p>
           <div class="home-cards"></div>
         </div>
         <div class="home-visual">
@@ -33,7 +29,6 @@ export const menuScreen = {
           <div class="home-board-frame"></div>
         </div>
       </div>
-      <p class="home-footer">A portfolio project · open source</p>
     `;
     root.appendChild(wrap);
 

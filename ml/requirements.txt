@@ -1,0 +1,6 @@
+# CPU-only training pipeline for the AlphaZero-style neural chess engine.
+torch==2.2.2
+numpy==1.26.4
+python-chess==1.999
+onnx==1.16.1
+onnxruntime==1.17.3
