@@ -12,8 +12,13 @@ export const pool = connectionString
       connectionString,
       ssl: useSsl ? { rejectUnauthorized: false } : false,
       max: 5,
+      connectionTimeoutMillis: 15000,
+      idleTimeoutMillis: 30000,
     })
   : null;
+
+// A pool error (e.g. a dropped pooler connection) shouldn't crash the process.
+if (pool) pool.on('error', (err) => console.error('PG pool error:', err.message));
 
 export function hasDb() {
   return !!pool;
