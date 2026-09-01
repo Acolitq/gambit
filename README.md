@@ -22,13 +22,18 @@ end and a small Node/WebSocket server for matchmaking.
 
 ### Study
 - **Post-game analysis** — every position is evaluated by **Stockfish 16**
-  (WASM, in a Web Worker). Moves are classified as blunder / mistake /
-  inaccuracy / best, each side gets an accuracy percentage, and an interactive
-  eval graph lets you jump to any moment of the game.
-- **Opponent scouting** — enter a Chess.com or Lichess username to pull their
-  recent games and build a prep dossier: most-played openings as White and Black
-  with win/draw/loss splits, time-control mix, and recent games you can open
-  straight in the analysis board.
+  (WASM, in a Web Worker). A vertical **eval bar**, numeric evaluations
+  (`+1.4`, `#3`), a live **multi-line engine panel** (top candidate moves), and
+  per-move blunder / mistake / inaccuracy / best classification with centipawn
+  loss. Each side gets an accuracy percentage and there's an interactive eval
+  graph to jump to any moment.
+- **Opponent scouting** — two modes:
+  - *Online:* a Chess.com or Lichess username → prep dossier of most-played
+    openings by colour with W/D/L splits, time-control mix, and recent games you
+    can open straight in the analysis board.
+  - *Over the board:* search FIDE and the Chess Federation of Canada by name →
+    ratings across federations, CFC rating history, and full tournament history,
+    with deep links to game databases.
 - **Openings trainer** — an explore board that names the current position live
   from a 3,800-line opening database, suggests named continuations, and plays
   out the main lines of the common openings.

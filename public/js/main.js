@@ -1,4 +1,4 @@
-import { initRouter, registerRoute } from './router.js';
+import { initRouter, registerRoute, refreshIcons } from './router.js';
 import { menuScreen } from './screens/menuScreen.js';
 import { setupScreen } from './screens/setupScreen.js';
 import { queueScreen } from './screens/queueScreen.js';
@@ -28,20 +28,31 @@ registerRoute('openings', openingsScreen);
 })();
 
 const toggle = document.getElementById('theme-toggle');
+function currentIsDark() {
+  const root = document.documentElement;
+  return (
+    root.dataset.theme === 'dark' ||
+    (!root.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches)
+  );
+}
+function syncToggleIcon() {
+  if (!toggle) return;
+  // Show the icon of the mode you'd switch TO.
+  toggle.innerHTML = `<i data-lucide="${currentIsDark() ? 'sun' : 'moon'}"></i>`;
+  refreshIcons();
+}
 if (toggle) {
   toggle.addEventListener('click', () => {
-    const root = document.documentElement;
-    const isDark =
-      root.dataset.theme === 'dark' ||
-      (!root.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-    const next = isDark ? 'light' : 'dark';
-    root.dataset.theme = next;
+    const next = currentIsDark() ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
     try {
       localStorage.setItem('gambit-theme', next);
     } catch {
       /* ignore */
     }
+    syncToggleIcon();
   });
+  syncToggleIcon();
 }
 
 initRouter(document.getElementById('app'));

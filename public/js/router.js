@@ -40,4 +40,11 @@ function render() {
   current = screen;
   screen.mount(rootEl, pendingParams);
   pendingParams = {};
+  refreshIcons();
+}
+
+// Replace any <i data-lucide> placeholders with SVGs. Safe to call repeatedly;
+// screens that render icons dynamically can call this too.
+export function refreshIcons() {
+  if (window.lucide) window.lucide.createIcons();
 }

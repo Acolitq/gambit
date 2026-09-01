@@ -8,6 +8,7 @@ import { wrapConnection } from './connection.js';
 import { Matchmaker } from './matchmaking.js';
 import { C2S, S2C, decode } from './protocol.js';
 import { scout } from './scout.js';
+import { otbSearch, otbPlayer } from './federation.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
@@ -27,6 +28,29 @@ app.get('/api/scout', async (req, res) => {
     res.json(dossier);
   } catch (err) {
     res.status(502).json({ error: err.message || 'Could not fetch games.' });
+  }
+});
+
+// OTB / federation scouting. Name search → candidates.
+app.get('/api/otb/search', async (req, res) => {
+  const name = String(req.query.name || '').trim();
+  if (name.length < 2) return res.status(400).json({ error: 'Enter at least 2 characters.' });
+  try {
+    res.json({ candidates: await otbSearch(name) });
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'Search failed.' });
+  }
+});
+
+// OTB player profile by CFC id and/or FIDE id.
+app.get('/api/otb/player', async (req, res) => {
+  const cfc = req.query.cfc ? String(req.query.cfc).replace(/\D/g, '') : null;
+  const fide = req.query.fide ? String(req.query.fide).replace(/\D/g, '') : null;
+  if (!cfc && !fide) return res.status(400).json({ error: 'Provide a CFC or FIDE id.' });
+  try {
+    res.json(await otbPlayer({ cfc, fide }));
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'Lookup failed.' });
   }
 });
 
