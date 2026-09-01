@@ -1,6 +1,7 @@
 // Tiny central state container with pub/sub. Screens read from it and the
 // router uses it to decide what to mount.
 const state = {
+  user: null, // { id, email } when signed in
   mode: null, // 'bot' | 'online'
   playerColor: 'w', // 'w' | 'b'
   level: 3, // 1..5, single-player only

@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="/styles/screens.css" />
     <link rel="stylesheet" href="/styles/analysis.css" />
     <link rel="stylesheet" href="/styles/study.css" />
+    <link rel="stylesheet" href="/styles/trackers.css" />
 
     <!-- chess.js is loaded as an ES module from a CDN via this import map, so the
          client and server share the same rules engine with no build step. -->
@@ -35,9 +36,12 @@
   <body>
     <header class="topbar">
       <a class="topbar-brand" href="#/menu">Gambit</a>
-      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
-        <i data-lucide="moon"></i>
-      </button>
+      <div class="topbar-right">
+        <div id="account" class="account"></div>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+          <i data-lucide="moon"></i>
+        </button>
+      </div>
     </header>
 
     <main id="app"></main>

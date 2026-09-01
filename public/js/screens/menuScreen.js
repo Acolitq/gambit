@@ -10,6 +10,7 @@ const CARDS = [
   { nav: 'analysis', icon: 'line-chart', title: 'Analyze a Game', sub: 'Engine review, eval bar, accuracy' },
   { nav: 'scout', icon: 'target', title: 'Scout Opponent', sub: "Prep against a player's real games" },
   { nav: 'openings', icon: 'book-open', title: 'Openings', sub: 'Learn and explore the main lines' },
+  { nav: 'trackers', icon: 'trophy', title: 'Tournament Trackers', sub: 'Save opponents and prep per event' },
 ];
 
 export const menuScreen = {

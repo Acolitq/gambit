@@ -12,3 +12,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.11.0
+      - key: NODE_ENV
+        value: production
+      # Set DATABASE_URL in the Render dashboard (Environment → secret), not here.
+      - key: DATABASE_URL
+        sync: false

@@ -9,12 +9,46 @@ import { Matchmaker } from './matchmaking.js';
 import { C2S, S2C, decode } from './protocol.js';
 import { scout } from './scout.js';
 import { otbSearch, otbPlayer } from './federation.js';
+import { initDb, hasDb } from './db.js';
+import { register, login, logout, me, requireAuth } from './auth.js';
+import {
+  listTrackers, createTracker, getTracker, deleteTracker,
+  addOpponent, deleteOpponent, importOpponentGames, uploadOpponentGames, opponentReport,
+} from './trackers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
 
 const app = express();
+app.use(express.json({ limit: '4mb' }));
 app.use(express.static(publicDir));
+
+// Guard for routes that need the database configured.
+function needDb(_req, res, next) {
+  if (!hasDb()) return res.status(503).json({ error: 'Accounts are not configured on this server.' });
+  next();
+}
+const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
+  console.error(err);
+  res.status(500).json({ error: 'Server error' });
+});
+
+// --- Auth ---
+app.post('/api/auth/register', needDb, wrap(register));
+app.post('/api/auth/login', needDb, wrap(login));
+app.post('/api/auth/logout', wrap(logout));
+app.get('/api/auth/me', wrap(me));
+
+// --- Trackers (all require a signed-in user) ---
+app.get('/api/trackers', needDb, requireAuth, wrap(listTrackers));
+app.post('/api/trackers', needDb, requireAuth, wrap(createTracker));
+app.get('/api/trackers/:id', needDb, requireAuth, wrap(getTracker));
+app.delete('/api/trackers/:id', needDb, requireAuth, wrap(deleteTracker));
+app.post('/api/trackers/:id/opponents', needDb, requireAuth, wrap(addOpponent));
+app.delete('/api/opponents/:id', needDb, requireAuth, wrap(deleteOpponent));
+app.post('/api/opponents/:id/import', needDb, requireAuth, wrap(importOpponentGames));
+app.post('/api/opponents/:id/games', needDb, requireAuth, wrap(uploadOpponentGames));
+app.get('/api/opponents/:id/report', needDb, requireAuth, wrap(opponentReport));
 
 // Opponent scouting proxy. GET /api/scout?platform=chesscom|lichess&username=...
 app.get('/api/scout', async (req, res) => {
@@ -118,6 +152,8 @@ const heartbeat = setInterval(() => {
 }, config.heartbeatMs);
 
 wss.on('close', () => clearInterval(heartbeat));
+
+initDb().catch((err) => console.error('DB init failed:', err.message));
 
 server.listen(config.port, () => {
   console.log(`Gambit server listening on http://localhost:${config.port}`);

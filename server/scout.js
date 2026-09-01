@@ -33,7 +33,7 @@ const OPENINGS = (() => {
 // Pull the SAN move tokens out of a PGN movetext (comments, clocks, move numbers
 // and NAGs stripped), then return the name of the deepest opening line that is a
 // prefix of the game — the standard way to classify an opening.
-function openingName(pgn) {
+export function openingName(pgn) {
   if (!pgn || !OPENINGS.size) return ecoHeader(pgn);
   const movetext = pgn.replace(/\[[^\]]*\]/g, '').replace(/\{[^}]*\}/g, '');
   const tokens = movetext
@@ -73,18 +73,22 @@ export async function scout(platform, username) {
   return data;
 }
 
-// --- Chess.com ---
-async function scoutChessCom(username) {
-  const u = username.toLowerCase();
-  const profile = await getJson(`https://api.chess.com/pub/player/${u}`);
-  if (!profile || profile.code) throw new Error('Player not found on Chess.com');
+// Collect an online player's recent games as normalized rows. Shared by the
+// scouting dossier and the tracker's game import.
+export async function collectGames(platform, username, max = MAX_GAMES) {
+  return platform === 'lichess'
+    ? collectLichessGames(username, max)
+    : collectChessComGames(username, max);
+}
 
+async function collectChessComGames(username, max = MAX_GAMES) {
+  const u = username.toLowerCase();
   const arch = await getJson(`https://api.chess.com/pub/player/${u}/games/archives`);
   const months = (arch.archives || []).slice(-MAX_MONTHS).reverse();
 
   const games = [];
   for (const url of months) {
-    if (games.length >= MAX_GAMES) break;
+    if (games.length >= max) break;
     const monthly = await getJson(url);
     for (const g of monthly.games || []) {
       if (g.rules && g.rules !== 'chess') continue; // skip variants
@@ -97,16 +101,26 @@ async function scoutChessCom(username) {
         opening: openingName(g.pgn),
         timeClass: g.time_class || 'unknown',
         url: g.url,
+        extId: g.url,
         pgn: g.pgn,
         endTime: g.end_time,
-        opponent:
-          color === 'white' ? g.black?.username : g.white?.username,
+        white: g.white?.username,
+        black: g.black?.username,
+        opponent: color === 'white' ? g.black?.username : g.white?.username,
         opponentRating: color === 'white' ? g.black?.rating : g.white?.rating,
       });
-      if (games.length >= MAX_GAMES) break;
+      if (games.length >= max) break;
     }
   }
+  return games;
+}
 
+// --- Chess.com ---
+async function scoutChessCom(username) {
+  const u = username.toLowerCase();
+  const profile = await getJson(`https://api.chess.com/pub/player/${u}`);
+  if (!profile || profile.code) throw new Error('Player not found on Chess.com');
+  const games = await collectChessComGames(u);
   return buildDossier({
     platform: 'chesscom',
     username: profile.username || username,
@@ -125,11 +139,10 @@ function normalizeChessComResult(code) {
   return 'loss';
 }
 
-// --- Lichess ---
-async function scoutLichess(username) {
+async function collectLichessGames(username, max = MAX_GAMES) {
   const url =
     `https://lichess.org/api/games/user/${encodeURIComponent(username)}` +
-    `?max=${MAX_GAMES}&opening=true&pgnInJson=true&clocks=false&evals=false`;
+    `?max=${max}&opening=true&pgnInJson=true&clocks=false&evals=false`;
   const res = await fetch(url, { headers: { Accept: 'application/x-ndjson', 'User-Agent': UA } });
   if (res.status === 404) throw new Error('Player not found on Lichess');
   if (!res.ok) throw new Error(`Lichess API error (${res.status})`);
@@ -155,15 +168,23 @@ async function scoutLichess(username) {
       opening: g.opening?.name || openingName(g.pgn),
       timeClass: g.speed || 'unknown',
       url: g.id ? `https://lichess.org/${g.id}` : null,
+      extId: g.id || null,
       pgn: g.pgn || null,
       endTime: g.lastMoveAt ? Math.floor(g.lastMoveAt / 1000) : null,
+      white: g.players?.white?.user?.name,
+      black: g.players?.black?.user?.name,
       opponent:
         color === 'white' ? g.players?.black?.user?.name : g.players?.white?.user?.name,
       opponentRating:
         color === 'white' ? g.players?.black?.rating : g.players?.white?.rating,
     });
   }
+  return games;
+}
 
+// --- Lichess ---
+async function scoutLichess(username) {
+  const games = await collectLichessGames(username);
   return buildDossier({
     platform: 'lichess',
     username,
