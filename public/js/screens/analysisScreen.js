@@ -5,6 +5,7 @@ import { createBoard } from '../ui/board.js';
 import { createEvalGraph } from '../analysis/evalGraph.js';
 import { createEvalBar } from '../analysis/evalBar.js';
 import { analyzeGame } from '../analysis/analyzer.js';
+import { getCachedAnalysis, setCachedAnalysis } from '../analysis/analysisCache.js';
 import { getEngine } from '../analysis/engineSingleton.js';
 import { formatEval, numberedLine } from '../analysis/evalFormat.js';
 
@@ -237,7 +238,29 @@ export const analysisScreen = {
       }
     }
 
+    function showReport() {
+      progressEl.hidden = true;
+      graph.setSeries(report.evalSeries);
+      renderMoveList();
+      accBlock.hidden = false;
+      wrap.querySelector('.acc-white .acc-value').textContent =
+        report.accuracy.w != null ? `${report.accuracy.w}%` : '—';
+      wrap.querySelector('.acc-black .acc-value').textContent =
+        report.accuracy.b != null ? `${report.accuracy.b}%` : '—';
+      goTo(0);
+    }
+
     async function runAnalysis(pgn) {
+      const depth = Number(wrap.querySelector('.depth-select').value);
+
+      // Instant path: reuse a cached report for this exact game + depth.
+      const cached = getCachedAnalysis(pgn, depth);
+      if (cached) {
+        report = cached;
+        showReport();
+        return;
+      }
+
       try {
         engine = getEngine();
       } catch {
@@ -249,7 +272,6 @@ export const analysisScreen = {
       progressFill.style.width = '0%';
       progressText.textContent = 'Starting engine…';
 
-      const depth = Number(wrap.querySelector('.depth-select').value);
       try {
         report = await analyzeGame(pgn, engine, {
           depth,
@@ -264,15 +286,8 @@ export const analysisScreen = {
         return;
       }
 
-      progressEl.hidden = true;
-      graph.setSeries(report.evalSeries);
-      renderMoveList();
-      accBlock.hidden = false;
-      wrap.querySelector('.acc-white .acc-value').textContent =
-        report.accuracy.w != null ? `${report.accuracy.w}%` : '—';
-      wrap.querySelector('.acc-black .acc-value').textContent =
-        report.accuracy.b != null ? `${report.accuracy.b}%` : '—';
-      goTo(0);
+      setCachedAnalysis(pgn, depth, report); // remember for next time
+      showReport();
     }
 
     // Controls
