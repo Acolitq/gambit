@@ -7,12 +7,29 @@ import { config } from './config.js';
 import { wrapConnection } from './connection.js';
 import { Matchmaker } from './matchmaking.js';
 import { C2S, S2C, decode } from './protocol.js';
+import { scout } from './scout.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
 
 const app = express();
 app.use(express.static(publicDir));
+
+// Opponent scouting proxy. GET /api/scout?platform=chesscom|lichess&username=...
+app.get('/api/scout', async (req, res) => {
+  const platform = req.query.platform === 'lichess' ? 'lichess' : 'chesscom';
+  const username = String(req.query.username || '').trim();
+  if (!username || !/^[\w-]{1,40}$/.test(username)) {
+    return res.status(400).json({ error: 'Invalid username.' });
+  }
+  try {
+    const dossier = await scout(platform, username);
+    res.json(dossier);
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'Could not fetch games.' });
+  }
+});
+
 // Single-page app: unknown routes fall through to index.html.
 app.get('*', (_req, res) => res.sendFile(join(publicDir, 'index.html')));
 

@@ -87,25 +87,19 @@
   filter: brightness(1.15);
 }
 
-/* Pieces — Unicode glyphs, sized to the square */
+/* Pieces — solid cburnett SVGs (the lichess set), sized to the square */
 .piece {
-  font-family: "Noto Sans Symbols2", var(--font-body);
-  font-size: calc(var(--board-size) / 8 * 0.72);
-  line-height: 1;
-  position: relative;
+  position: absolute;
+  inset: 4%;
   z-index: 1;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
   transition: transform 80ms ease-out;
 }
-.piece-w {
-  color: var(--piece-white);
-  text-shadow: 0 0 1px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-.piece-b {
-  color: var(--piece-black);
-  text-shadow: 0 0 1px rgba(255, 255, 255, 0.25);
-}
 .square.selected .piece {
-  transform: scale(1.08);
+  transform: scale(1.06);
 }
 
 /* Coordinate labels tucked into edge squares */
@@ -154,13 +148,13 @@
   height: 56px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface-alt);
-  font-family: "Noto Sans Symbols2", var(--font-body);
-  font-size: 38px;
-  line-height: 1;
+  background-color: var(--surface-alt);
+  background-size: 80% 80%;
+  background-position: center;
+  background-repeat: no-repeat;
   transition: background-color 120ms ease, transform 100ms ease;
 }
 .promotion-choice:hover {
-  background: var(--accent);
+  background-color: var(--accent);
   transform: translateY(-2px);
 }

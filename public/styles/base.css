@@ -14,11 +14,10 @@
   --danger: #b33a3a;
   --focus-ring: rgba(181, 101, 29, 0.4);
 
-  --sq-light: #ede4d3;
-  --sq-dark: #8c6b4f;
-  --piece-white: #fafaf7;
-  --piece-black: #211f1c;
-  --last-move: rgba(242, 201, 76, 0.42);
+  /* lichess "brown" board */
+  --sq-light: #f0d9b5;
+  --sq-dark: #b58863;
+  --last-move: rgba(155, 199, 0, 0.41);
 
   --font-display: "Manrope", -apple-system, "Segoe UI", sans-serif;
   --font-body: "Inter", -apple-system, "Segoe UI", sans-serif;
@@ -45,10 +44,9 @@
   --danger: #d9635c;
   --focus-ring: rgba(224, 138, 62, 0.45);
 
-  --sq-light: #d8cdb8;
-  --sq-dark: #6b5138;
-  --piece-white: #f6f2ea;
-  --piece-black: #16130d;
+  /* board stays the same warm brown in dark mode, like lichess */
+  --sq-light: #f0d9b5;
+  --sq-dark: #b58863;
   --shadow-raised: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
@@ -66,10 +64,8 @@
     --success: #4caf7d;
     --danger: #d9635c;
     --focus-ring: rgba(224, 138, 62, 0.45);
-    --sq-light: #d8cdb8;
-    --sq-dark: #6b5138;
-    --piece-white: #f6f2ea;
-    --piece-black: #16130d;
+    --sq-light: #f0d9b5;
+    --sq-dark: #b58863;
     --shadow-raised: 0 8px 20px rgba(0, 0, 0, 0.35);
   }
 }

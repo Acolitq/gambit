@@ -263,10 +263,15 @@
 .captured {
   display: flex;
   align-items: center;
-  gap: 1px;
-  font-family: "Noto Sans Symbols2", var(--font-body);
-  font-size: 18px;
-  color: var(--text-secondary);
+  gap: 0;
+}
+.cap-piece {
+  width: 18px;
+  height: 18px;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  margin-right: -3px;
 }
 .material-adv {
   font-family: var(--font-body);

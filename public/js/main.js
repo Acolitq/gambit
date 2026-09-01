@@ -5,6 +5,8 @@ import { queueScreen } from './screens/queueScreen.js';
 import { gameScreen } from './screens/gameScreen.js';
 import { resultScreen } from './screens/resultScreen.js';
 import { analysisScreen } from './screens/analysisScreen.js';
+import { scoutScreen } from './screens/scoutScreen.js';
+import { openingsScreen } from './screens/openingsScreen.js';
 
 registerRoute('menu', menuScreen);
 registerRoute('setup', setupScreen);
@@ -12,6 +14,8 @@ registerRoute('queue', queueScreen);
 registerRoute('game', gameScreen);
 registerRoute('result', resultScreen);
 registerRoute('analysis', analysisScreen);
+registerRoute('scout', scoutScreen);
+registerRoute('openings', openingsScreen);
 
 // Theme: respect a saved preference, else follow the system setting.
 (function initTheme() {

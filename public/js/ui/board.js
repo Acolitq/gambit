@@ -3,10 +3,13 @@
 // for legal targets and reports completed moves back through callbacks.
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-const GLYPHS = {
-  w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
-  b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' },
-};
+
+// cburnett SVG piece set (the lichess default). File names are colour + type,
+// e.g. wK.svg, bQ.svg.
+const PIECE_DIR = '/assets/pieces/cburnett';
+function pieceUrl(color, type) {
+  return `${PIECE_DIR}/${color}${type.toUpperCase()}.svg`;
+}
 
 export function createBoard({ mount, orientation = 'w', onMove, legalMovesFor }) {
   let squares = new Map(); // 'e4' -> square element
@@ -74,7 +77,7 @@ export function createBoard({ mount, orientation = 'w', onMove, legalMovesFor })
       if (piece) {
         const span = document.createElement('span');
         span.className = `piece piece-${piece.color}`;
-        span.textContent = GLYPHS[piece.color][piece.type];
+        span.style.backgroundImage = `url('${pieceUrl(piece.color, piece.type)}')`;
         el.appendChild(span);
       }
     }
@@ -135,7 +138,7 @@ export function createBoard({ mount, orientation = 'w', onMove, legalMovesFor })
     for (const type of ['q', 'r', 'b', 'n']) {
       const btn = document.createElement('button');
       btn.className = `promotion-choice piece-${color}`;
-      btn.textContent = GLYPHS[color][type];
+      btn.style.backgroundImage = `url('${pieceUrl(color, type)}')`;
       btn.addEventListener('click', () => {
         overlay.remove();
         done(type);

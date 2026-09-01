@@ -24,6 +24,16 @@ export const menuScreen = {
           <span class="menu-card-title">Analyze a Game</span>
           <span class="menu-card-sub">Engine review with an accuracy report</span>
         </button>
+        <button class="menu-card menu-card-scout" data-nav="scout">
+          <span class="menu-card-icon">◉</span>
+          <span class="menu-card-title">Scout Opponent</span>
+          <span class="menu-card-sub">Prep against a player's real games</span>
+        </button>
+        <button class="menu-card menu-card-openings" data-nav="openings">
+          <span class="menu-card-icon">❖</span>
+          <span class="menu-card-title">Openings</span>
+          <span class="menu-card-sub">Learn and explore the main lines</span>
+        </button>
       </div>
       <p class="menu-footer">A portfolio project · open source</p>
     `;
@@ -40,6 +50,8 @@ export const menuScreen = {
       store.set({ lastPgn: null }); // open a blank analyzer, not the last game
       navigate('analysis');
     });
+    wrap.querySelector('[data-nav="scout"]').addEventListener('click', () => navigate('scout'));
+    wrap.querySelector('[data-nav="openings"]').addEventListener('click', () => navigate('openings'));
 
     root.appendChild(wrap);
   },

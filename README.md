@@ -8,6 +8,7 @@ end and a small Node/WebSocket server for matchmaking.
 
 ## Features
 
+### Play
 - **Single-player vs bots** — five levels, from a blundering beginner to a
   deeper-searching "Master". The engine is negamax with alpha-beta pruning and a
   material + piece-square-table evaluation; lower levels play weaker on purpose
@@ -18,8 +19,22 @@ end and a small Node/WebSocket server for matchmaking.
 - **Full chess rules** — castling, en passant, promotion, check/checkmate,
   stalemate, and draw detection, courtesy of [`chess.js`](https://github.com/jhlywa/chess.js)
   shared by both client and server.
-- **Polished UI** — light/dark themes, move history, captured-piece tracking,
-  legal-move hints, last-move and check highlights, and per-side clocks.
+
+### Study
+- **Post-game analysis** — every position is evaluated by **Stockfish 16**
+  (WASM, in a Web Worker). Moves are classified as blunder / mistake /
+  inaccuracy / best, each side gets an accuracy percentage, and an interactive
+  eval graph lets you jump to any moment of the game.
+- **Opponent scouting** — enter a Chess.com or Lichess username to pull their
+  recent games and build a prep dossier: most-played openings as White and Black
+  with win/draw/loss splits, time-control mix, and recent games you can open
+  straight in the analysis board.
+- **Openings trainer** — an explore board that names the current position live
+  from a 3,800-line opening database, suggests named continuations, and plays
+  out the main lines of the common openings.
+
+- **Polished UI** — the lichess board and piece set, light/dark themes, move
+  history, captured-piece tracking, legal-move hints, and per-side clocks.
 
 ## Tech
 
@@ -81,6 +96,12 @@ WebSocket endpoint on the same port, so it deploys anywhere that runs Node and
 supports WebSockets (Render, Railway, Fly.io, a VPS). A `render.yaml` is
 included for one-click Render deploys.
 
+## Credits
+
+- Chess piece images: the **cburnett** SVG set by [Colin M.L. Burnett](https://en.wikipedia.org/wiki/User:Cburnett), via [lichess-org/lila](https://github.com/lichess-org/lila), licensed **GPLv2+**.
+- Move legality: [`chess.js`](https://github.com/jhlywa/chess.js). Analysis engine: [Stockfish 16](https://stockfishchess.org/) (WASM), GPLv3.
+- Opponent scouting and opening data via the public [Chess.com](https://www.chess.com/news/view/published-data-api) and [Lichess](https://lichess.org/api) APIs.
+
 ## License
 
-MIT © Acolitq
+MIT © Acolitq (application code; bundled assets keep their own licenses noted above)

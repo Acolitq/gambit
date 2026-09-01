@@ -7,8 +7,8 @@ import { createStatusBar } from '../ui/statusBar.js';
 import { createGame } from '../game/gameController.js';
 import { LEVELS } from '../engine/bot.js';
 
-const GLYPHS = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+const pieceUrl = (color, type) => `/assets/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 
 export const gameScreen = {
   mount(root, params = {}) {
@@ -69,18 +69,20 @@ export const gameScreen = {
 
     // Captured pieces + material advantage rendering.
     function renderCaptured(cap) {
-      // cap.w = black pieces white captured; shown in White's panel.
+      // cap.w = the black pieces White has captured; shown in White's panel.
       const whitePanel = playerColor === 'w' ? bottomPanel : topPanel;
       const blackPanel = playerColor === 'w' ? topPanel : bottomPanel;
-      paint(whitePanel, cap.w, score(cap.w) - score(cap.b));
-      paint(blackPanel, cap.b, score(cap.b) - score(cap.w));
+      paint(whitePanel, cap.w, 'b', score(cap.w) - score(cap.b));
+      paint(blackPanel, cap.b, 'w', score(cap.b) - score(cap.w));
     }
     function score(list) {
       return list.reduce((s, t) => s + (VALUES[t] || 0), 0);
     }
-    function paint(panel, pieces, advantage) {
+    function paint(panel, pieces, color, advantage) {
       const el = panel.querySelector('.captured');
-      el.innerHTML = pieces.map((t) => `<span class="cap-piece">${GLYPHS[t]}</span>`).join('');
+      el.innerHTML = pieces
+        .map((t) => `<span class="cap-piece" style="background-image:url('${pieceUrl(color, t)}')"></span>`)
+        .join('');
       if (advantage > 0) {
         el.innerHTML += `<span class="material-adv">+${advantage}</span>`;
       }
