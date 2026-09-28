@@ -6,8 +6,8 @@
 }
 .home-hero {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: var(--space-8);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: var(--space-7);
   align-items: center;
   min-height: 68vh;
 }
@@ -22,7 +22,7 @@
 }
 .home-title {
   font-family: var(--font-display);
-  font-size: 72px;
+  font-size: clamp(44px, 11vw, 72px);
   line-height: 0.95;
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -38,15 +38,17 @@
 }
 .home-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 .home-card {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
+  min-height: 76px;
   text-align: left;
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -59,9 +61,6 @@
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: var(--border-strong);
-}
-.home-card:last-child {
-  grid-column: 1 / -1;
 }
 .home-card-icon {
   width: 40px;
@@ -81,6 +80,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 .home-card-title {
   font-weight: 600;
@@ -88,6 +88,7 @@
 }
 .home-card-sub {
   font-size: 13px;
+  line-height: 1.35;
   color: var(--text-secondary);
 }
 
@@ -106,7 +107,7 @@
 }
 .home-board-frame {
   position: relative;
-  width: min(460px, 40vw);
+  width: min(460px, 100%);
   border-radius: var(--radius-xs);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   overflow: hidden;
@@ -114,7 +115,7 @@
 /* Home playable 3D board */
 .home-board-3d {
   position: relative;
-  width: min(620px, 46vw);
+  width: min(620px, 100%);
   aspect-ratio: 5 / 4;
 }
 .board3d-canvas {
@@ -154,6 +155,11 @@
   padding: 0 var(--space-3);
   font-size: 13px;
 }
+@media (pointer: coarse) {
+  .home-board-actions .btn {
+    height: 40px;
+  }
+}
 .home-board-hint {
   flex-basis: 100%;
   text-align: center;
@@ -167,20 +173,44 @@
   text-align: center;
 }
 
-@media (max-width: 900px) {
+/* Stack once the hero column gets too narrow for the board beside the cards
+   (the sidebar eats 232px above 860px, so this kicks in before the topbar does). */
+@media (max-width: 1100px) {
   .home-hero {
-    grid-template-columns: 1fr;
-    gap: var(--space-6);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
     min-height: 0;
   }
   .home-visual {
     order: -1;
   }
   .home-board-frame {
-    width: min(420px, 82vw);
+    width: min(420px, 100%);
   }
   .home-board-3d {
-    width: min(520px, 92vw);
+    width: min(560px, 100%);
+  }
+}
+@media (max-width: 560px) {
+  .home-hero {
+    gap: var(--space-4);
+  }
+  .home-title {
+    margin-bottom: var(--space-2);
+  }
+  .home-tagline {
+    font-size: 15px;
+    margin-bottom: var(--space-5);
+  }
+  .home-cards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  .home-card {
+    min-height: 64px;
+  }
+  .home-card:hover {
+    transform: none;
   }
 }
 
@@ -239,22 +269,23 @@
   position: relative;
   max-width: 480px;
   width: 100%;
-  padding: 32px;
+  padding: var(--space-6);
   box-shadow: var(--shadow-raised);
 }
 .setup-card h2 {
   font-size: 24px;
-  font-weight: 600;
-  margin: 44px 0 24px;
+  font-weight: 700;
+  margin: var(--space-6) 0 var(--space-5);
 }
-.back-link {
+/* Scoped: .back-link is also used inline in other screens' headers. */
+.setup-card .back-link {
   position: absolute;
-  top: 20px;
-  left: 16px;
+  top: var(--space-4);
+  left: var(--space-4);
 }
 .engine-toggle {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
 }
 .engine-opt {
@@ -283,7 +314,8 @@
 }
 .level-pills {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: var(--space-3);
 }
 .level-pill {
   width: 44px;
@@ -303,21 +335,22 @@
   transform: scale(1.05);
 }
 .level-caption {
-  margin: 12px 0 0;
+  margin: var(--space-3) 0 0;
   font-size: 13px;
   color: var(--text-secondary);
 }
 .color-choices {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .color-choice {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
   border-radius: var(--radius-panel);
   border: 2px solid var(--border);
   background: var(--surface);
@@ -354,8 +387,9 @@
   min-height: 60vh;
 }
 .queue-card {
-  width: 320px;
-  padding: 40px 24px;
+  width: 100%;
+  max-width: 360px;
+  padding: var(--space-7) var(--space-5) var(--space-6);
   text-align: center;
   box-shadow: var(--shadow-raised);
 }
@@ -398,17 +432,23 @@
 }
 
 /* ---- Game ---- */
+/* The screen is a size container so the board can be sized from the space
+   actually available (cqi) instead of guessing at sidebar + scrollbar widths.
+   --board-size also sets the stacked side column's width so edges line up. */
 .game-screen {
+  container-type: inline-size;
+  --board-size: min(600px, calc(100cqi - 320px - var(--space-5)), calc(100dvh - 200px));
   display: flex;
-  gap: 24px;
+  gap: var(--space-5);
   align-items: flex-start;
   justify-content: center;
-  padding-top: 24px;
+  padding-top: var(--space-5);
 }
 .game-main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
+  min-width: 0;
 }
 .board-host {
   display: flex;
@@ -419,15 +459,20 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
-  padding: 8px 16px;
+  padding: var(--space-2) var(--space-4);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
 }
 .player-id {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.player-id > div {
+  min-width: 0;
 }
 .avatar {
   width: 32px;
@@ -445,6 +490,9 @@
 .player-name {
   font-weight: 600;
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .player-rating {
   font-size: 13px;
@@ -453,7 +501,8 @@
 .panel-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
+  flex-shrink: 0;
 }
 .captured {
   display: flex;
@@ -491,9 +540,10 @@
 
 .game-side {
   width: 320px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 .status-bar {
   background: var(--surface-alt);
@@ -546,12 +596,13 @@
 }
 .game-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 4px;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
 }
 .game-actions .btn {
   flex: 1;
-  padding: 12px;
+  height: 44px;
+  padding: 0 var(--space-3);
 }
 
 /* ---- Result ---- */
@@ -561,14 +612,15 @@
   min-height: 60vh;
 }
 .result-card {
-  width: 360px;
-  padding: 40px 32px;
+  width: 100%;
+  max-width: 380px;
+  padding: var(--space-7) var(--space-6) var(--space-6);
   text-align: center;
   box-shadow: var(--shadow-raised);
 }
 .result-title {
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 800;
 }
 .result-card.tone-success .result-title {
   color: var(--success);
@@ -583,16 +635,69 @@
 .result-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
-/* ---- Responsive: stack the sidebar under the board ---- */
-@media (max-width: 960px) {
+/* ---- Responsive: stack the side column under the board ----
+   Below 1180px the board beside a 320px column gets cramped (the desktop
+   sidebar takes 232px), so stack and let the board use the full width. */
+@media (max-width: 1180px) {
   .game-screen {
+    --board-size: min(600px, 100cqi, max(300px, calc(100dvh - 250px)));
     flex-direction: column;
     align-items: center;
+    gap: var(--space-4);
   }
   .game-side {
-    width: min(640px, 90vw);
+    width: var(--board-size);
+  }
+}
+@media (max-width: 560px) {
+  .game-screen {
+    padding-top: var(--space-3);
+  }
+  .game-main {
+    gap: var(--space-2);
+  }
+  .player-panel {
+    height: 48px;
+    padding: var(--space-1) var(--space-3);
+  }
+  .avatar {
+    width: 28px;
+    height: 28px;
+  }
+  .game-side .status-bar {
+    min-height: 48px;
+    padding: var(--space-3);
+  }
+  .game-side .move-list {
+    max-height: 200px;
+  }
+}
+
+/* ---- Login (base styles live in trackers.css) ---- */
+.login-screen .login-toggle {
+  flex-wrap: wrap;
+  align-items: center;
+}
+@media (max-width: 480px) {
+  .login-screen .login-card {
+    padding: var(--space-5);
+  }
+  .setup-card {
+    padding: var(--space-5) var(--space-4);
+  }
+  .setup-card .back-link {
+    top: var(--space-3);
+    left: var(--space-3);
+  }
+  .setup-card h2 {
+    font-size: 22px;
+    margin-top: var(--space-6);
+  }
+  .result-card,
+  .queue-card {
+    padding: var(--space-6) var(--space-5) var(--space-5);
   }
 }

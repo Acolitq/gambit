@@ -8,7 +8,8 @@
 //   - FIDE snapshot + cross-federation name search: api.chesstools.org.
 //
 // No source offers OTB game moves by player name, so we surface deep links to
-// game databases rather than pretending to have the games.
+// game databases rather than pretending to have the games. CFC crosstables do
+// give every rated game's opponent and result, which cfcGameLog() rebuilds.
 
 const UA = 'Gambit/1.0 (portfolio chess study app; contact via github.com/Acolitq)';
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -20,9 +21,9 @@ async function getJson(url, { accept = 'application/json' } = {}) {
   return res.json();
 }
 
-function cached(key, fn) {
+function cached(key, fn, ttl = CACHE_TTL_MS) {
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return Promise.resolve(hit.data);
+  if (hit && Date.now() - hit.at < ttl) return Promise.resolve(hit.data);
   return fn().then((data) => {
     cache.set(key, { at: Date.now(), data });
     return data;
@@ -186,4 +187,95 @@ function displayName(fideName) {
   if (!fideName) return 'Unknown';
   const m = fideName.split(',');
   return m.length === 2 ? `${m[1].trim()} ${m[0].trim()}` : fideName;
+}
+
+// --- OTB game log from CFC crosstables ---
+// A CFC event's crosstable lists each player's round results. Swiss events use
+// "+9|-2|=7" (result, then the opponent's crosstable line; 0 = bye/forfeit);
+// round robins use a grid of "X|1|0|=" with one column per player. We rebuild
+// one row per game: event, round, opponent (name + pre-event rating), result.
+// Moves aren't published, so these are results only.
+const EVENT_TTL_MS = 12 * 60 * 60 * 1000; // finished events don't change
+
+export async function cfcGameLog(cfcId, { maxEvents = 30 } = {}) {
+  const data = await cached(`cfcplayer:${cfcId}`, () => getCfcPlayer(cfcId));
+  const events = (data.player.events || [])
+    .slice()
+    .sort((a, b) => (a.date_end < b.date_end ? 1 : -1))
+    .slice(0, maxEvents);
+
+  const crosstables = await mapLimit(events, 4, (e) =>
+    cached(`cfcevent:${e.id}`, () => getJson(`https://server.chess.ca/api/event/v1/${e.id}`), EVENT_TTL_MS)
+      .then((d) => d.event?.crosstable || [])
+      .catch(() => null),
+  );
+
+  const log = [];
+  events.forEach((e, i) => {
+    const table = crosstables[i];
+    const summary = {
+      id: e.id,
+      name: e.name,
+      date: e.date_end,
+      type: e.rating_type === 'Q' ? 'Quick' : 'Regular',
+      score: e.score,
+      games: e.games_played,
+      pre: e.rating_pre,
+      post: e.rating_post,
+      perf: e.rating_perf,
+      rounds: [],
+      unavailable: !table,
+    };
+    const me = table && table.find((row) => String(row.cfc_id) === String(cfcId));
+    if (me) summary.rounds = parseRounds(me, table);
+    log.push(summary);
+  });
+  return log;
+}
+
+function parseRounds(me, table) {
+  const cells = String(me.results || '').split('|');
+  const roundRobin = cells.some((c) => c === 'X');
+  const rounds = [];
+  cells.forEach((cell, i) => {
+    let result = null;
+    let opp = null;
+    if (roundRobin) {
+      if (cell === 'X') return;
+      result = cell === '1' ? 'win' : cell === '0' ? 'loss' : cell === '=' || cell === '½' ? 'draw' : null;
+      opp = table[i];
+    } else {
+      const m = cell.match(/^([+\-=])(\d+)$/);
+      if (!m) return;
+      result = m[1] === '+' ? 'win' : m[1] === '-' ? 'loss' : 'draw';
+      const line = Number(m[2]);
+      if (line === 0) {
+        rounds.push({ round: i + 1, result, bye: true });
+        return;
+      }
+      opp = table[line - 1];
+    }
+    if (!result) return;
+    rounds.push({
+      round: roundRobin ? null : i + 1,
+      result,
+      opponent: opp ? displayName(opp.name) : 'Unknown',
+      opponentCfcId: opp?.cfc_id ? String(opp.cfc_id) : null,
+      opponentRating: opp?.rating_pre || null,
+    });
+  });
+  return rounds;
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
 }

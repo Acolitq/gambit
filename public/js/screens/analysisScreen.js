@@ -207,7 +207,7 @@ export const analysisScreen = {
         row.classList.toggle('active', Number(row.dataset.ply) === cursor);
       }
       const active = moveListEl.querySelector('.amove.active');
-      if (active) active.scrollIntoView({ block: 'nearest' });
+      if (active) scrollListTo(moveListEl, active);
     }
 
     function renderMoveList() {
@@ -364,4 +364,14 @@ function pvToSan(fen, uciMoves, max) {
     out.push(res.san);
   }
   return out;
+}
+
+// Keep `item` visible inside the scrollable `list` without scrolling the page
+// (scrollIntoView would also jump the window when the list sits below the fold
+// on phones).
+function scrollListTo(list, item) {
+  const l = list.getBoundingClientRect();
+  const r = item.getBoundingClientRect();
+  if (r.top < l.top) list.scrollTop -= l.top - r.top;
+  else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
 }

@@ -50,7 +50,8 @@ const scrimEl = document.getElementById('sidebar-scrim');
 const toggleEl = document.getElementById('sidebar-toggle');
 
 function currentRoute() {
-  return window.location.hash.replace(/^#\//, '') || 'menu';
+  // Hash is #/name or #/name/id/sub — only the name picks the nav item.
+  return window.location.hash.replace(/^#\//, '').split('/')[0] || 'menu';
 }
 
 function buildNav() {
@@ -111,17 +112,33 @@ function renderFoot() {
 }
 store.subscribe(renderFoot);
 
-// Mobile off-canvas toggle.
+// Mobile off-canvas toggle. body.nav-open locks page scroll behind the drawer.
 function openSidebar() {
   sidebarEl.dataset.open = 'true';
   if (scrimEl) scrimEl.hidden = false;
+  document.body.classList.add('nav-open');
+  toggleEl?.setAttribute('aria-expanded', 'true');
+  sidebarEl.querySelector('.sb-link.active, .sb-link')?.focus({ preventScroll: true });
 }
 function closeSidebar() {
+  const wasOpen = sidebarEl.dataset.open === 'true';
   sidebarEl.dataset.open = 'false';
   if (scrimEl) scrimEl.hidden = true;
+  document.body.classList.remove('nav-open');
+  toggleEl?.setAttribute('aria-expanded', 'false');
+  if (wasOpen && sidebarEl.contains(document.activeElement)) toggleEl?.focus({ preventScroll: true });
 }
-if (toggleEl) toggleEl.addEventListener('click', openSidebar);
+if (toggleEl) {
+  toggleEl.setAttribute('aria-controls', 'sidebar');
+  toggleEl.setAttribute('aria-expanded', 'false');
+  toggleEl.addEventListener('click', openSidebar);
+}
 if (scrimEl) scrimEl.addEventListener('click', closeSidebar);
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && sidebarEl.dataset.open === 'true') closeSidebar();
+});
+// Rotating/resizing up to the desktop layout shouldn't leave the drawer state behind.
+window.matchMedia('(min-width: 861px)').addEventListener('change', (e) => e.matches && closeSidebar());
 
 buildNav();
 renderFoot();

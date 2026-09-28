@@ -1,9 +1,10 @@
 /* Chessboard, pieces, highlight overlays and the promotion picker. */
 
 .board {
-  --board-size: min(540px, 82vw, calc(100vh - 250px));
-  width: var(--board-size);
-  height: var(--board-size);
+  /* Screens set --board-size on their container (so side panels can match it);
+     anything that doesn't gets the old viewport-based default. */
+  width: var(--board-size, min(540px, 82vw, calc(100vh - 250px)));
+  height: var(--board-size, min(540px, 82vw, calc(100vh - 250px)));
   aspect-ratio: 1 / 1;
   display: grid;
   grid-template-columns: repeat(8, 1fr);

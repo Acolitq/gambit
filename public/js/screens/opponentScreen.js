@@ -1,27 +1,33 @@
-import { navigate } from '../router.js';
+import { navigate, replaceHash, refreshIcons } from '../router.js';
 import { store } from '../store.js';
 import { api } from '../net/api.js';
-import { refreshIcons } from '../router.js';
+import { userReady } from '../authClient.js';
 import { createReviewBoard } from '../analysis/reviewBoard.js';
+import { fmtDate } from '../tracker/util.js';
+
+let mounted = 0;
 
 // Review a single opponent's real games on an engine board: pick a game from the
 // list and it plays out on the board with Stockfish evaluating every position,
 // live candidate lines, and the best move they (or their opponent) should have
-// played at each turn.
+// played at each turn. URL: #/opponent/<opponent id>/<game id>, so a refresh
+// reopens the same game.
 export const opponentScreen = {
   async mount(root, params = {}) {
+    const token = ++mounted;
+    await userReady();
+    if (token !== mounted) return;
     if (!store.get('user')) return navigate('login');
-    const opponentId = params.id || store.get('currentOpponentId');
+    const opponentId = params.id;
     if (!opponentId) return navigate('trackers');
-    store.set({ currentOpponentId: opponentId });
-    const trackerId = params.trackerId || store.get('currentTrackerId');
+    let trackerId = null;
 
     const wrap = document.createElement('div');
     wrap.className = 'screen opponent-screen';
     wrap.innerHTML = `
       <div class="scout-head">
         <div>
-          <button class="text-link back-link"><i data-lucide="arrow-left"></i> Back to tracker</button>
+          <button class="text-link back-link"><i data-lucide="arrow-left"></i> Back to dossier</button>
           <h1 class="opp-title">Games</h1>
           <p class="opp-sub">Replay any game with the engine — eval, best moves, and where it turned.</p>
         </div>
@@ -46,15 +52,16 @@ export const opponentScreen = {
         <section class="opp-review">
           <div class="opp-review-empty">
             <i data-lucide="mouse-pointer-click"></i>
-            <p>Select a game on the left to load it onto the board.</p>
+            <p>Pick a game to replay it with the engine.</p>
           </div>
         </section>
       </div>
     `;
     root.appendChild(wrap);
+    refreshIcons();
 
     wrap.querySelector('.back-link').addEventListener('click', () =>
-      navigate('tracker', trackerId ? { id: trackerId } : {}),
+      trackerId ? navigate('tracker', { id: trackerId, sub: opponentId }) : navigate('trackers'),
     );
 
     const listEl = wrap.querySelector('.opp-games-list');
@@ -72,21 +79,25 @@ export const opponentScreen = {
       const data = await api(`/opponents/${opponentId}/games`);
       games = data.games;
       oppName = data.opponent.name;
+      trackerId = data.opponent.tracker_id;
     } catch (err) {
-      listEl.innerHTML = `<div class="scout-error">${escapeHtml(err.message)}</div>`;
+      if (token === mounted) listEl.innerHTML = `<div class="scout-error">${escapeHtml(err.message)}</div>`;
       return;
     }
+    if (token !== mounted) return;
 
     wrap.querySelector('.opp-title').textContent = oppName;
     countEl.textContent = games.length ? `${games.length}` : '';
 
     if (!games.length) {
       listEl.innerHTML =
-        '<div class="op-empty">No games stored yet. Import online games or upload PGN from the tracker.</div>';
+        '<div class="op-empty">No games stored yet. Sync their online games or paste PGN from their dossier.</div>';
       return;
     }
 
     renderGameList();
+    const wanted = params.sub && games.find((g) => String(g.id) === String(params.sub));
+    if (wanted) openGame(wanted, listEl.querySelector(`.opp-game[data-id="${wanted.id}"]`));
 
     function renderGameList() {
       listEl.innerHTML = '';
@@ -97,7 +108,7 @@ export const opponentScreen = {
         item.dataset.id = g.id;
         const opp = otherPlayer(g, lname);
         const rv = resultView(g.opp_result);
-        const date = g.played_at ? String(g.played_at).slice(0, 10) : '';
+        const date = fmtDate(g.played_at);
         const colorDot = g.opp_color === 'black' ? 'b' : 'w';
         item.innerHTML = `
           <span class="og-color og-${colorDot}" title="Played as ${colorDot === 'w' ? 'White' : 'Black'}"></span>
@@ -118,6 +129,8 @@ export const opponentScreen = {
     async function openGame(g, itemEl) {
       if (activeGameId === g.id) return;
       activeGameId = g.id;
+      replaceHash('opponent', { id: opponentId, sub: g.id });
+      itemEl?.scrollIntoView({ block: 'nearest' });
       for (const b of listEl.querySelectorAll('.opp-game')) {
         b.classList.toggle('active', b === itemEl);
       }
@@ -136,6 +149,10 @@ export const opponentScreen = {
         </div>
       `;
       reviewBoard = createReviewBoard({ mount: reviewEl });
+      // Stacked layout (phones): the board is below the list, so bring it into view.
+      if (itemEl && window.matchMedia('(max-width: 820px)').matches) {
+        reviewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
 
       let pgn;
       try {
@@ -161,6 +178,7 @@ export const opponentScreen = {
   },
 
   unmount() {
+    mounted++;
     const board = this._getBoard && this._getBoard();
     if (board) board.destroy();
   },

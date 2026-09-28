@@ -13,8 +13,8 @@ import { initDb, hasDb } from './db.js';
 import { register, login, logout, me, requireAuth } from './auth.js';
 import {
   listTrackers, createTracker, getTracker, deleteTracker,
-  addOpponent, deleteOpponent, importOpponentGames, uploadOpponentGames, opponentReport,
-  listOpponentGames, getGame,
+  addOpponent, getOpponent, updateOpponent, deleteOpponent, importOpponentGames, uploadOpponentGames,
+  opponentReport, opponentOtb, listOpponentGames, getGame, addNote, updateNote, deleteNote,
 } from './trackers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -46,7 +46,13 @@ app.post('/api/trackers', needDb, requireAuth, wrap(createTracker));
 app.get('/api/trackers/:id', needDb, requireAuth, wrap(getTracker));
 app.delete('/api/trackers/:id', needDb, requireAuth, wrap(deleteTracker));
 app.post('/api/trackers/:id/opponents', needDb, requireAuth, wrap(addOpponent));
+app.get('/api/opponents/:id', needDb, requireAuth, wrap(getOpponent));
+app.patch('/api/opponents/:id', needDb, requireAuth, wrap(updateOpponent));
 app.delete('/api/opponents/:id', needDb, requireAuth, wrap(deleteOpponent));
+app.get('/api/opponents/:id/otb', needDb, requireAuth, wrap(opponentOtb));
+app.post('/api/opponents/:id/notes', needDb, requireAuth, wrap(addNote));
+app.patch('/api/notes/:id', needDb, requireAuth, wrap(updateNote));
+app.delete('/api/notes/:id', needDb, requireAuth, wrap(deleteNote));
 app.post('/api/opponents/:id/import', needDb, requireAuth, wrap(importOpponentGames));
 app.post('/api/opponents/:id/games', needDb, requireAuth, wrap(uploadOpponentGames));
 app.get('/api/opponents/:id/report', needDb, requireAuth, wrap(opponentReport));
