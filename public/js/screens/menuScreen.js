@@ -1,4 +1,4 @@
-import { navigate } from '../router.js';
+import { navigate, refreshIcons } from '../router.js';
 import { store } from '../store.js';
 import { createStaticBoard } from '../ui/staticBoard.js';
 
@@ -13,6 +13,10 @@ const CARDS = [
   { nav: 'trackers', icon: 'trophy', title: 'Tournament Trackers', sub: 'Save opponents and prep per event' },
 ];
 
+let board3d = null;
+let mountId = 0; // guards the lazy 3D import against a mount/unmount race
+const ZOOM_HINT = window.matchMedia('(pointer: coarse)').matches ? 'pinch to zoom' : 'scroll to zoom';
+
 export const menuScreen = {
   mount(root) {
     const wrap = document.createElement('div');
@@ -26,16 +30,48 @@ export const menuScreen = {
         </div>
         <div class="home-visual">
           <div class="home-board-glow"></div>
-          <div class="home-board-frame"></div>
+          <div class="home-board-3d"></div>
+          <div class="home-board-hud" hidden>
+            <span class="home-board-status" aria-live="polite"></span>
+            <span class="home-board-actions">
+              <button class="btn btn-ghost" data-act="undo"><i data-lucide="undo-2"></i>Undo</button>
+              <button class="btn btn-ghost" data-act="reset"><i data-lucide="rotate-ccw"></i>New game</button>
+            </span>
+            <span class="home-board-hint">Drag to orbit · ${ZOOM_HINT}</span>
+          </div>
         </div>
       </div>
     `;
     root.appendChild(wrap);
 
-    // Decorative empty board with faint ghost pieces.
-    const frame = wrap.querySelector('.home-board-frame');
-    const sb = createStaticBoard(frame, { fen: START_FEN, orientation: 'w' });
-    sb.el.classList.add('ghost-board');
+    // Playable 3D board vs the bot. three.js is loaded lazily so the rest of the
+    // app never waits on it; without WebGL (or the CDN) the flat ghost board shows.
+    const stage = wrap.querySelector('.home-board-3d');
+    const hud = wrap.querySelector('.home-board-hud');
+    const statusEl = hud.querySelector('.home-board-status');
+    const undoBtn = hud.querySelector('[data-act="undo"]');
+    const id = ++mountId;
+    const fallback = () => {
+      stage.className = 'home-board-frame';
+      const sb = createStaticBoard(stage, { fen: START_FEN, orientation: 'w' });
+      sb.el.classList.add('ghost-board');
+    };
+    import('../ui/board3d.js')
+      .then(({ createBoard3D }) => {
+        if (id !== mountId) return;
+        board3d = createBoard3D(stage, {
+          onStatus({ text, canUndo }) {
+            statusEl.textContent = text;
+            undoBtn.disabled = !canUndo;
+          },
+        });
+        if (!board3d) return fallback();
+        hud.hidden = false;
+        undoBtn.addEventListener('click', () => board3d.undo());
+        hud.querySelector('[data-act="reset"]').addEventListener('click', () => board3d.reset());
+        refreshIcons();
+      })
+      .catch(() => id === mountId && fallback());
 
     // Cards
     const cardsEl = wrap.querySelector('.home-cards');
@@ -56,5 +92,11 @@ export const menuScreen = {
       });
       cardsEl.appendChild(btn);
     }
+  },
+
+  unmount() {
+    mountId++;
+    board3d?.destroy();
+    board3d = null;
   },
 };

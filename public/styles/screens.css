@@ -111,6 +111,55 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   overflow: hidden;
 }
+/* Home playable 3D board */
+.home-board-3d {
+  position: relative;
+  width: min(620px, 46vw);
+  aspect-ratio: 5 / 4;
+}
+.board3d-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+.board3d-canvas:active {
+  cursor: grabbing;
+}
+.home-board-hud {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-3);
+}
+.home-board-hud[hidden] {
+  display: none;
+}
+.home-board-status {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  min-width: 17ch;
+  text-align: center;
+}
+.home-board-actions {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.home-board-actions .btn {
+  height: 32px;
+  padding: 0 var(--space-3);
+  font-size: 13px;
+}
+.home-board-hint {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
 .home-footer {
   margin-top: var(--space-7);
   font-size: 12px;
@@ -129,6 +178,9 @@
   }
   .home-board-frame {
     width: min(420px, 82vw);
+  }
+  .home-board-3d {
+    width: min(520px, 92vw);
   }
 }
 

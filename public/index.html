@@ -33,11 +33,14 @@
     <link rel="stylesheet" href="/styles/trackers.css" />
 
     <!-- chess.js is loaded as an ES module from a CDN via this import map, so the
-         client and server share the same rules engine with no build step. -->
+         client and server share the same rules engine with no build step.
+         three.js powers the 3D board on the home screen. -->
     <script type="importmap">
       {
         "imports": {
-          "chess.js": "https://esm.sh/chess.js@1.0.0"
+          "chess.js": "https://esm.sh/chess.js@1.0.0",
+          "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
         }
       }
     </script>
