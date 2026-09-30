@@ -25,7 +25,15 @@ export async function register(email, password) {
   return user;
 }
 
+// Always resets the local state, even if the request fails. Resolves true when
+// the server confirmed (session deleted, cookie cleared), false otherwise.
 export async function logout() {
-  await api('/auth/logout', { method: 'POST' });
-  store.set({ user: null });
+  try {
+    await api('/auth/logout', { method: 'POST' });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    store.set({ user: null });
+  }
 }

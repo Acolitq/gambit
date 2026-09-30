@@ -76,6 +76,19 @@ function syncActive() {
   }
 }
 
+// Brief status line under the account links (e.g. "Signed out."), cleared on a timer.
+let footNote = '';
+let footNoteTimer = null;
+function flashFootNote(text) {
+  footNote = text;
+  clearTimeout(footNoteTimer);
+  footNoteTimer = setTimeout(() => {
+    footNote = '';
+    renderFoot();
+  }, 4000);
+  renderFoot();
+}
+
 // Account / user card in the sidebar footer.
 function renderFoot() {
   if (!footEl) return;
@@ -96,15 +109,18 @@ function renderFoot() {
         </div>
       </div>
     `;
-    footEl.querySelector('#sb-signout').addEventListener('click', async () => {
-      await logout();
-      renderFoot();
+    footEl.querySelector('#sb-signout').addEventListener('click', async (e) => {
+      e.currentTarget.disabled = true;
+      // logout() resets the store (re-rendering this footer) even if the request fails.
+      const confirmed = await logout();
+      flashFootNote(confirmed ? 'Signed out.' : "Signed out here — couldn't reach the server.");
       window.location.hash = '#/menu';
     });
   } else {
     footEl.innerHTML = `
       ${onlineLink}
       <a class="sb-link" href="#/login"><i data-lucide="log-in"></i><span class="sb-link-label">Sign in</span></a>
+      <div class="sb-note" role="status">${footNote}</div>
     `;
   }
   refreshIcons();

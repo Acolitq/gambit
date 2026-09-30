@@ -10,7 +10,7 @@ import { C2S, S2C, decode } from './protocol.js';
 import { scout } from './scout.js';
 import { otbSearch, otbPlayer } from './federation.js';
 import { initDb, hasDb } from './db.js';
-import { register, login, logout, me, requireAuth } from './auth.js';
+import { register, login, logout, me, requireAuth, sendDbError } from './auth.js';
 import {
   listTrackers, createTracker, getTracker, deleteTracker,
   addOpponent, deleteOpponent, importOpponentGames, uploadOpponentGames, opponentReport,
@@ -26,12 +26,15 @@ app.use(express.static(publicDir));
 
 // Guard for routes that need the database configured.
 function needDb(_req, res, next) {
-  if (!hasDb()) return res.status(503).json({ error: 'Accounts are not configured on this server.' });
+  if (!hasDb()) {
+    return res.status(503).json({ error: 'Accounts are not configured on this server.', code: 'accounts_disabled' });
+  }
   next();
 }
+// Unhandled route errors: logged, then 503 if the DB is unreachable, else 500.
 const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
-  console.error(err);
-  res.status(500).json({ error: 'Server error' });
+  if (!res.headersSent) sendDbError(res, err, req.path);
+  else console.error(err);
 });
 
 // --- Auth ---

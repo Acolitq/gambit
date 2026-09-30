@@ -29,6 +29,30 @@ export function query(text, params) {
   return pool.query(text, params);
 }
 
+// True when an error means the database itself can't be reached (DNS failure,
+// refused/reset connection, timeout, server shutting down, or a hosted pooler
+// rejecting us, e.g. Supabase's "tenant/user not found" XX000), as opposed to a
+// query-level error like a constraint violation.
+const NET_CODES = new Set([
+  'ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT',
+  'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE',
+]);
+export function isDbUnavailable(err) {
+  if (!err) return false;
+  const code = String(err.code || '');
+  const msg = String(err.message || '');
+  if (NET_CODES.has(code)) return true;
+  // SQLSTATE 08xxx = connection exception; 57P0x = admin/crash shutdown or
+  // cannot connect now; 53300 = too many connections; 28xxx = the server
+  // rejected our credentials (misconfigured or deleted project).
+  if (/^(08|57P0|53300|28)/.test(code)) return true;
+  if (code === 'XX000' && /tenant|user not found/i.test(msg)) return true;
+  // pg-pool's own failures carry no SQLSTATE, only a message
+  // ("timeout exceeded when trying to connect", "Connection terminated ...").
+  const hasSqlState = /^[0-9A-Z]{5}$/.test(code);
+  return !hasSqlState && /timeout|terminated|connect|not configured/i.test(msg);
+}
+
 // Create tables on first boot. Idempotent — safe to run every start.
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (

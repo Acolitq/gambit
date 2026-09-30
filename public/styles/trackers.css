@@ -76,12 +76,57 @@
 .login-field input:focus {
   border-color: var(--accent);
 }
-.login-error {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  color: var(--verdict-blunder);
+.login-field input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+/* A field plus its hint / error, packed tighter than the form's gap. */
+.login-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.login-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.login-field-error {
+  font-size: 13px;
+  color: var(--danger);
+}
+.login-inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.login-inline-link:hover {
+  color: var(--accent);
+}
+/* Live regions stay in the DOM (so screen readers announce changes) and just
+   collapse while empty. */
+.login-field-error:empty,
+.login-error:empty,
+.login-success:empty {
+  display: none;
+}
+.login-error,
+.login-success {
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   font-size: 13px;
+}
+.login-error {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--verdict-blunder);
+}
+.login-success {
+  background: var(--accent-tint);
+  color: var(--success);
+  font-weight: 600;
 }
 .login-toggle {
   margin-top: var(--space-5);
