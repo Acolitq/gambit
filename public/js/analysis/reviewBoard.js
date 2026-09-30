@@ -2,7 +2,7 @@ import { Chess } from 'chess.js';
 import { createBoard } from '../ui/board.js';
 import { createEvalBar } from './evalBar.js';
 import { createEvalGraph } from './evalGraph.js';
-import { analyzeGame } from './analyzer.js';
+import { analyzeGame, parseGame } from './analyzer.js';
 import { getCachedAnalysis, setCachedAnalysis } from './analysisCache.js';
 import { getEngine } from './engineSingleton.js';
 import { formatEval, numberedLine } from './evalFormat.js';
@@ -39,7 +39,7 @@ export function createReviewBoard({ mount }) {
       </div>
       <div class="analysis-progress" hidden>
         <div class="progress-track"><div class="progress-fill"></div></div>
-        <span class="progress-text">Analyzing…</span>
+        <span class="progress-text"></span>
       </div>
     </div>
     <div class="review-panels">
@@ -87,6 +87,7 @@ export function createReviewBoard({ mount }) {
   let report = null;
   let cursor = 0;
   let engine = null;
+  let run = null; // AbortController for the in-flight full-game analysis
 
   function currentFen() {
     if (!report) return new Chess().fen();
@@ -112,19 +113,26 @@ export function createReviewBoard({ mount }) {
     runLiveEngine(fen);
   }
 
+  // Only runs with a report loaded; results for a position we've since left
+  // (or a review that was reset) are dropped.
   function runLiveEngine(fen) {
-    if (!fen || !engine) return;
+    if (!fen || !engine || !report) return;
+    const stale = () => !report || fen !== currentFen();
     engineLinesEl.classList.add('thinking');
     engine
       .analyze(fen, {
         depth: LIVE_DEPTH,
         multiPv: LIVE_MULTIPV,
-        onUpdate: (lines) => renderEngineLines(lines, fen),
+        onUpdate: (lines) => {
+          if (!stale()) renderEngineLines(lines, fen);
+        },
       })
       .then((lines) => {
+        if (stale()) return;
         engineLinesEl.classList.remove('thinking');
         renderEngineLines(lines, fen);
-      });
+      })
+      .catch(() => engineLinesEl.classList.remove('thinking'));
   }
 
   function renderEngineLines(lines, fen) {
@@ -206,8 +214,44 @@ export function createReviewBoard({ mount }) {
     }
   }
 
+  // Back to idle: no report, neutral eval bar, nothing running.
+  function reset() {
+    report = null;
+    cursor = 0;
+    if (engine) engine.stop();
+    board.setPosition(new Chess().fen());
+    board.highlightLastMove(null, null);
+    evalBar.clear();
+    graph.setSeries([]);
+    moveListEl.innerHTML = '';
+    accBlock.hidden = true;
+    progressEl.hidden = true;
+    progressEl.classList.remove('is-error');
+    progressText.textContent = '';
+    assessEl.hidden = true;
+    engineDepthEl.textContent = '';
+    engineLinesEl.classList.remove('thinking');
+    engineLinesEl.innerHTML = '';
+  }
+
+  // Idle board with the reason shown in place of the progress bar.
+  function showError(message) {
+    reset();
+    progressEl.classList.add('is-error');
+    progressText.textContent = message;
+    progressEl.hidden = false;
+  }
+
   function display() {
     progressEl.hidden = true;
+    progressEl.classList.remove('is-error');
+    if (!engine) {
+      try {
+        engine = getEngine(); // cached reports skip the batch pass; live lines still need it
+      } catch {
+        /* engine unavailable: the review still shows, just without live lines */
+      }
+    }
     graph.setSeries(report.evalSeries);
     renderMoveList();
     accBlock.hidden = false;
@@ -220,11 +264,19 @@ export function createReviewBoard({ mount }) {
 
   // Run a full-game analysis of `pgn` and display it. Resolves with the report.
   // Reuses a cached report (per PGN + depth) so a game is only analyzed once.
+  // Blank/invalid/move-less PGN, engine failure or analysis errors reject and
+  // leave the board idle with the reason shown (never a stuck "Analyzing…").
   async function analyze(pgn, { depth = 12 } = {}) {
-    report = null;
-    cursor = 0;
-    engineLinesEl.innerHTML = '';
-    assessEl.hidden = true;
+    if (run) run.abort(); // latest call wins
+    run = null;
+    reset();
+
+    try {
+      parseGame(pgn);
+    } catch (err) {
+      showError(err.message);
+      throw err;
+    }
 
     // Instant path: reuse a cached report for this exact game + depth.
     const cached = getCachedAnalysis(pgn, depth);
@@ -237,29 +289,43 @@ export function createReviewBoard({ mount }) {
     try {
       engine = getEngine();
     } catch {
-      progressEl.hidden = false;
-      progressText.textContent = 'Engine failed to load.';
-      throw new Error('Engine failed to load.');
+      const err = new Error('The engine failed to load.');
+      showError(err.message);
+      throw err;
     }
+    const ctl = new AbortController();
+    run = ctl;
     progressEl.hidden = false;
-    accBlock.hidden = true;
     progressFill.style.width = '0%';
     progressText.textContent = 'Starting engine…';
 
+    let result;
     try {
-      report = await analyzeGame(pgn, engine, {
+      result = await analyzeGame(pgn, engine, {
         depth,
+        signal: ctl.signal,
         onProgress: (done, total) => {
+          if (ctl.signal.aborted) return;
           const pct = Math.round((done / total) * 100);
           progressFill.style.width = `${pct}%`;
           progressText.textContent = `Analyzing… ${done}/${total} positions`;
         },
       });
     } catch (err) {
-      progressText.textContent = `Could not analyze: ${err.message}`;
+      if (!ctl.signal.aborted) {
+        run = null;
+        showError(`Could not analyze: ${err.message}`);
+      }
       throw err;
     }
+    if (ctl.signal.aborted) {
+      const err = new Error('Analysis cancelled.');
+      err.name = 'AbortError';
+      throw err;
+    }
+    run = null;
 
+    report = result;
     setCachedAnalysis(pgn, depth, report); // remember for next time
     display();
     return report;
@@ -300,11 +366,10 @@ export function createReviewBoard({ mount }) {
     goToStart: () => goTo(0),
     destroy() {
       window.removeEventListener('keydown', onKey);
-      try {
-        getEngine().stop();
-      } catch {
-        /* engine may not exist */
-      }
+      // Cancel the full-game pass too, or it keeps feeding positions to the
+      // shared engine and starves the next board's analysis.
+      if (run) run.abort();
+      if (engine) engine.stop();
       board.destroy();
       el.remove();
     },

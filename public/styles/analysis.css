@@ -72,6 +72,10 @@
   bottom: 5px;
   color: var(--eb-black);
 }
+/* Nothing loaded: even split, muted, no number */
+.eval-bar.idle .eb-track {
+  opacity: 0.45;
+}
 
 /* Engine panel */
 .engine-panel {
@@ -135,6 +139,16 @@
 }
 .engine-lines.thinking {
   opacity: 0.75;
+}
+/* Empty-state prompt, centered in the reserved lines area */
+.engine-empty {
+  margin: auto 0;
+  padding: 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  text-align: center;
+  text-wrap: pretty;
 }
 .engine-line {
   display: flex;
@@ -245,6 +259,23 @@
 .sample-row {
   text-align: center;
 }
+.import-error {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+/* These blocks set their own `display`, which beats the UA's [hidden] rule, so
+   without this they rendered even while hidden (an empty page showed a bare
+   progress track reading "Analyzing…" and "— / —" accuracy). */
+.analysis-progress[hidden],
+.accuracy-block[hidden],
+.move-assessment[hidden],
+.import-error[hidden] {
+  display: none;
+}
 
 /* Progress */
 .analysis-progress {
@@ -268,6 +299,13 @@
   font-size: 12px;
   color: var(--text-secondary);
   text-align: center;
+}
+/* Failed run (review board): just the reason, no half-filled bar */
+.analysis-progress.is-error .progress-track {
+  display: none;
+}
+.analysis-progress.is-error .progress-text {
+  color: var(--danger);
 }
 
 /* Accuracy */
@@ -309,6 +347,11 @@
   border-radius: var(--radius-panel);
   overflow: hidden;
   border: 1px solid var(--border);
+}
+/* No game yet: hide the empty graph frame and move list box entirely */
+.eval-graph:empty,
+.analysis-move-list:empty {
+  display: none;
 }
 .eval-svg {
   width: 100%;
