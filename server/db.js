@@ -110,7 +110,26 @@ CREATE TABLE IF NOT EXISTS games (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Timestamped notes per opponent (replaces the single opponents.notes field).
+CREATE TABLE IF NOT EXISTS opponent_notes (
+  id           SERIAL PRIMARY KEY,
+  opponent_id  INTEGER NOT NULL REFERENCES opponents(id) ON DELETE CASCADE,
+  body         TEXT NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Latest known OTB rating, and when online games were last pulled.
+ALTER TABLE opponents ADD COLUMN IF NOT EXISTS rating INTEGER;
+ALTER TABLE opponents ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ;
+
+-- Move any legacy free-text notes into the notes table (a no-op once done).
+INSERT INTO opponent_notes (opponent_id, body, created_at, updated_at)
+  SELECT id, notes, created_at, created_at FROM opponents WHERE notes IS NOT NULL AND btrim(notes) <> '';
+UPDATE opponents SET notes = NULL WHERE notes IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_trackers_user ON trackers(user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_opponent ON opponent_notes(opponent_id);
 CREATE INDEX IF NOT EXISTS idx_opponents_tracker ON opponents(tracker_id);
 CREATE INDEX IF NOT EXISTS idx_games_opponent ON games(opponent_id);
 -- Avoid importing the same online game twice for an opponent.

@@ -1,6 +1,7 @@
 import { Chess } from 'chess.js';
 import { query } from './db.js';
 import { collectGames, openingName } from './scout.js';
+import { otbPlayer, cfcGameLog } from './federation.js';
 
 // All handlers assume requireAuth has set req.user.
 
@@ -15,6 +16,16 @@ async function ownOpponent(userId, opponentId) {
      JOIN trackers t ON t.id = o.tracker_id
      WHERE o.id = $1 AND t.user_id = $2`,
     [opponentId, userId],
+  );
+  return rows[0] || null;
+}
+async function ownNote(userId, noteId) {
+  const { rows } = await query(
+    `SELECT n.* FROM opponent_notes n
+     JOIN opponents o ON o.id = n.opponent_id
+     JOIN trackers t ON t.id = o.tracker_id
+     WHERE n.id = $1 AND t.user_id = $2`,
+    [noteId, userId],
   );
   return rows[0] || null;
 }
@@ -57,10 +68,12 @@ export async function getTracker(req, res) {
   const tracker = await ownTracker(req.user.id, req.params.id);
   if (!tracker) return res.status(404).json({ error: 'Tracker not found.' });
   const { rows: opponents } = await query(
-    `SELECT o.*, COUNT(g.id)::int AS game_count
-     FROM opponents o LEFT JOIN games g ON g.opponent_id = o.id
+    `SELECT o.*,
+       (SELECT COUNT(*)::int FROM games g WHERE g.opponent_id = o.id) AS game_count,
+       (SELECT COUNT(*)::int FROM opponent_notes n WHERE n.opponent_id = o.id) AS note_count
+     FROM opponents o
      WHERE o.tracker_id = $1
-     GROUP BY o.id ORDER BY o.created_at ASC`,
+     ORDER BY o.created_at ASC`,
     [tracker.id],
   );
   res.json({ tracker, opponents });
@@ -79,13 +92,108 @@ export async function addOpponent(req, res) {
   if (!tracker) return res.status(404).json({ error: 'Tracker not found.' });
   const name = String(req.body?.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Opponent name is required.' });
-  const { chesscom, lichess, fideId, cfcId, notes } = req.body || {};
+  const { chesscom, lichess, fideId, cfcId, rating, notes } = req.body || {};
   const { rows } = await query(
-    `INSERT INTO opponents (tracker_id, name, chesscom, lichess, fide_id, cfc_id, notes)
+    `INSERT INTO opponents (tracker_id, name, chesscom, lichess, fide_id, cfc_id, rating)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [tracker.id, name, clean(chesscom), clean(lichess), clean(fideId), clean(cfcId), notes ? String(notes) : null],
+    [tracker.id, name, clean(chesscom), clean(lichess), digits(fideId), digits(cfcId), toInt(rating)],
+  );
+  const opponent = rows[0];
+  if (notes && String(notes).trim()) {
+    await query('INSERT INTO opponent_notes (opponent_id, body) VALUES ($1,$2)', [opponent.id, String(notes).trim()]);
+  }
+  res.json({ opponent });
+}
+
+// One opponent with their notes, for the dossier view.
+export async function getOpponent(req, res) {
+  const opp = await ownOpponent(req.user.id, req.params.id);
+  if (!opp) return res.status(404).json({ error: 'Opponent not found.' });
+  const [{ rows: notes }, { rows: counts }] = await Promise.all([
+    query('SELECT id, body, created_at, updated_at FROM opponent_notes WHERE opponent_id = $1 ORDER BY created_at DESC', [opp.id]),
+    query('SELECT COUNT(*)::int AS n FROM games WHERE opponent_id = $1', [opp.id]),
+  ]);
+  res.json({ opponent: { ...opp, game_count: counts[0].n }, notes });
+}
+
+// Edit name / linked accounts. Only fields present in the body change.
+export async function updateOpponent(req, res) {
+  const opp = await ownOpponent(req.user.id, req.params.id);
+  if (!opp) return res.status(404).json({ error: 'Opponent not found.' });
+  const b = req.body || {};
+  const next = {
+    name: 'name' in b ? String(b.name || '').trim() : opp.name,
+    chesscom: 'chesscom' in b ? clean(b.chesscom) : opp.chesscom,
+    lichess: 'lichess' in b ? clean(b.lichess) : opp.lichess,
+    fide_id: 'fideId' in b ? digits(b.fideId) : opp.fide_id,
+    cfc_id: 'cfcId' in b ? digits(b.cfcId) : opp.cfc_id,
+    rating: 'rating' in b ? toInt(b.rating) : opp.rating,
+  };
+  if (!next.name) return res.status(400).json({ error: 'Name is required.' });
+  // Relinking an online account means the next open should re-sync.
+  const relinked = next.chesscom !== opp.chesscom || next.lichess !== opp.lichess;
+  const { rows } = await query(
+    `UPDATE opponents SET name=$2, chesscom=$3, lichess=$4, fide_id=$5, cfc_id=$6, rating=$7,
+       synced_at = CASE WHEN $8 THEN NULL ELSE synced_at END
+     WHERE id=$1 RETURNING *`,
+    [opp.id, next.name, next.chesscom, next.lichess, next.fide_id, next.cfc_id, next.rating, relinked],
   );
   res.json({ opponent: rows[0] });
+}
+
+// --- Notes ---
+export async function addNote(req, res) {
+  const opp = await ownOpponent(req.user.id, req.params.id);
+  if (!opp) return res.status(404).json({ error: 'Opponent not found.' });
+  const body = String(req.body?.body || '').trim();
+  if (!body) return res.status(400).json({ error: 'Note is empty.' });
+  const { rows } = await query(
+    'INSERT INTO opponent_notes (opponent_id, body) VALUES ($1,$2) RETURNING id, body, created_at, updated_at',
+    [opp.id, body],
+  );
+  res.json({ note: rows[0] });
+}
+
+export async function updateNote(req, res) {
+  const note = await ownNote(req.user.id, req.params.id);
+  if (!note) return res.status(404).json({ error: 'Note not found.' });
+  const body = String(req.body?.body || '').trim();
+  if (!body) return res.status(400).json({ error: 'Note is empty.' });
+  const { rows } = await query(
+    'UPDATE opponent_notes SET body=$2, updated_at=now() WHERE id=$1 RETURNING id, body, created_at, updated_at',
+    [note.id, body],
+  );
+  res.json({ note: rows[0] });
+}
+
+export async function deleteNote(req, res) {
+  const note = await ownNote(req.user.id, req.params.id);
+  if (!note) return res.status(404).json({ error: 'Note not found.' });
+  await query('DELETE FROM opponent_notes WHERE id = $1', [note.id]);
+  res.json({ ok: true });
+}
+
+// --- OTB record: CFC/FIDE ratings plus the CFC crosstable game log ---
+export async function opponentOtb(req, res) {
+  const opp = await ownOpponent(req.user.id, req.params.id);
+  if (!opp) return res.status(404).json({ error: 'Opponent not found.' });
+  if (!opp.cfc_id && !opp.fide_id) return res.json({ linked: false });
+  try {
+    const [profile, events] = await Promise.all([
+      otbPlayer({ cfc: opp.cfc_id, fide: opp.fide_id }),
+      opp.cfc_id ? cfcGameLog(opp.cfc_id) : Promise.resolve([]),
+    ]);
+    // Keep the roster's rating fresh: CFC regular, else FIDE standard.
+    const rating = profile.ratings.find((r) => r.federation === 'CFC' && r.label === 'Regular')?.value
+      ?? profile.ratings.find((r) => r.federation === 'FIDE')?.value
+      ?? null;
+    if (rating && rating !== opp.rating) {
+      await query('UPDATE opponents SET rating = $2 WHERE id = $1', [opp.id, rating]);
+    }
+    res.json({ linked: true, profile: { ...profile, tournaments: undefined }, events });
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'Could not reach the federation.' });
+  }
 }
 
 export async function deleteOpponent(req, res) {
@@ -130,6 +238,7 @@ export async function importOpponentGames(req, res) {
       errors.push(`${platform}: ${err.message}`);
     }
   }
+  await query('UPDATE opponents SET synced_at = now() WHERE id = $1', [opp.id]);
   res.json({ imported, errors });
 }
 
@@ -221,7 +330,7 @@ export async function opponentReport(req, res) {
   res.json({
     opponent: {
       id: opp.id, name: opp.name, chesscom: opp.chesscom, lichess: opp.lichess,
-      fide_id: opp.fide_id, cfc_id: opp.cfc_id, notes: opp.notes,
+      fide_id: opp.fide_id, cfc_id: opp.cfc_id,
     },
     gameCount: total,
     totals,
@@ -294,6 +403,14 @@ function prepPoints({ openingsWhite, openingsBlack, drawRate }) {
 function clean(v) {
   const s = v == null ? '' : String(v).trim();
   return s || null;
+}
+function digits(v) {
+  const s = v == null ? '' : String(v).replace(/\D/g, '');
+  return s || null;
+}
+function toInt(v) {
+  const n = Number.parseInt(v, 10);
+  return Number.isFinite(n) ? n : null;
 }
 function resultString(color, oppResult) {
   if (oppResult === 'draw') return '1/2-1/2';

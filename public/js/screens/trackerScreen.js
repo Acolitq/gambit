@@ -1,242 +1,260 @@
-import { navigate } from '../router.js';
+import { navigate, refreshIcons } from '../router.js';
 import { store } from '../store.js';
 import { api } from '../net/api.js';
-import { refreshIcons } from '../router.js';
+import { userReady } from '../authClient.js';
+import { escapeHtml, initials, fmtDate, relDay, prefs } from '../tracker/util.js';
+import { renderOpponentForm } from '../tracker/opponentForm.js';
+import { createDossier } from '../tracker/dossier.js';
 
-// A single tracker: its opponents, and each opponent's prep report.
+// One event's prep workspace: the roster of opponents on the left, the selected
+// opponent's dossier on the right (stacked on phones). The URL carries the
+// selection — #/tracker/<event>/<opponent> or #/tracker/<event>/new — so a
+// refresh or the back button lands in the same place, and the last opponent
+// viewed per event is remembered for next time.
+let view = null; // live workspace state while mounted
+let mounted = 0;
+
 export const trackerScreen = {
   async mount(root, params = {}) {
+    const token = ++mounted;
+    await userReady();
+    if (token !== mounted) return;
     if (!store.get('user')) return navigate('login');
-    const trackerId = params.id || store.get('currentTrackerId');
+
+    const trackerId = params.id || prefs.get('lastTrackerId');
     if (!trackerId) return navigate('trackers');
-    store.set({ currentTrackerId: trackerId });
 
     const wrap = document.createElement('div');
-    wrap.className = 'screen tracker-screen';
+    wrap.className = 'screen prep-screen ws-screen';
     wrap.innerHTML = `
-      <div class="scout-head">
-        <div>
-          <button class="text-link back-link"><i data-lucide="arrow-left"></i> All trackers</button>
-          <h1 class="tk-title">Tracker</h1>
-          <p class="tk-sub"></p>
+      <header class="prep-head ws-head">
+        <div class="ws-head-main">
+          <button class="text-link ws-back"><i data-lucide="arrow-left"></i> Events</button>
+          <h1 class="prep-title ws-title">Loading…</h1>
+          <p class="prep-sub ws-sub"></p>
         </div>
-        <button class="btn btn-ghost delete-tracker">Delete tracker</button>
+        <button class="btn btn-ghost ws-delete"><i data-lucide="trash-2"></i><span>Delete event</span></button>
+      </header>
+
+      <div class="ws-layout" data-view="roster">
+        <aside class="ws-roster card">
+          <div class="rs-top">
+            <div class="rs-search">
+              <i data-lucide="search"></i>
+              <input class="rs-search-input" type="search" placeholder="Find opponent" aria-label="Find opponent" />
+            </div>
+            <button class="btn btn-primary rs-add"><i data-lucide="user-plus"></i><span>Add</span></button>
+          </div>
+          <div class="rs-list" role="list"><div class="prep-loading">Loading…</div></div>
+        </aside>
+        <section class="ws-main"></section>
       </div>
-
-      <form class="opponent-add card">
-        <h3>Add an opponent</h3>
-        <div class="oa-grid">
-          <input class="oa-name" type="text" placeholder="Name *" required />
-          <input class="oa-chesscom" type="text" placeholder="Chess.com username" />
-          <input class="oa-lichess" type="text" placeholder="Lichess username" />
-          <input class="oa-fide" type="text" placeholder="FIDE id (optional)" />
-        </div>
-        <button type="submit" class="btn btn-primary">Add opponent</button>
-      </form>
-
-      <div class="opponent-list"></div>
     `;
     root.appendChild(wrap);
+    refreshIcons();
 
-    wrap.querySelector('.back-link').addEventListener('click', () => navigate('trackers'));
+    view = {
+      trackerId: String(trackerId),
+      wrap,
+      opponents: [],
+      filter: '',
+      selected: null,
+      dossier: null,
+      layout: wrap.querySelector('.ws-layout'),
+      listEl: wrap.querySelector('.rs-list'),
+      mainEl: wrap.querySelector('.ws-main'),
+    };
 
-    const listEl = wrap.querySelector('.opponent-list');
-
-    async function load() {
-      try {
-        const { tracker, opponents } = await api(`/trackers/${trackerId}`);
-        wrap.querySelector('.tk-title').textContent = tracker.name;
-        wrap.querySelector('.tk-sub').textContent = tracker.event_date
-          ? `Event date: ${tracker.event_date.slice(0, 10)}`
-          : '';
-        renderOpponents(opponents);
-      } catch (err) {
-        listEl.innerHTML = `<div class="scout-error">${err.message}</div>`;
-      }
-    }
-
-    wrap.querySelector('.delete-tracker').addEventListener('click', async () => {
-      if (!confirm('Delete this tracker and all its opponents?')) return;
-      await api(`/trackers/${trackerId}`, { method: 'DELETE' });
+    wrap.querySelector('.ws-back').addEventListener('click', () => navigate('trackers'));
+    wrap.querySelector('.rs-add').addEventListener('click', () => select('new'));
+    wrap.querySelector('.rs-search-input').addEventListener('input', (e) => {
+      view.filter = e.target.value.trim().toLowerCase();
+      renderRoster();
+    });
+    wrap.querySelector('.ws-delete').addEventListener('click', async () => {
+      if (!confirm('Delete this event and everything in it (opponents, notes, games)?')) return;
+      await api(`/trackers/${view.trackerId}`, { method: 'DELETE' });
+      prefs.set({ lastTrackerId: null });
       navigate('trackers');
     });
 
-    wrap.querySelector('.opponent-add').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const body = {
-        name: wrap.querySelector('.oa-name').value.trim(),
-        chesscom: wrap.querySelector('.oa-chesscom').value.trim(),
-        lichess: wrap.querySelector('.oa-lichess').value.trim(),
-        fideId: wrap.querySelector('.oa-fide').value.trim(),
-      };
-      if (!body.name) return;
-      try {
-        await api(`/trackers/${trackerId}/opponents`, { method: 'POST', body });
-        e.target.reset();
-        load();
-      } catch (err) {
-        alert(err.message);
+    let data;
+    try {
+      data = await api(`/trackers/${view.trackerId}`);
+    } catch (err) {
+      if (token !== mounted) return;
+      if (/not found/i.test(err.message)) {
+        prefs.set({ lastTrackerId: null });
+        return navigate('trackers');
       }
-    });
-
-    function renderOpponents(opponents) {
-      if (!opponents.length) {
-        listEl.innerHTML = '<div class="op-empty">No opponents yet — add one above.</div>';
-        return;
-      }
-      listEl.innerHTML = '';
-      for (const o of opponents) listEl.appendChild(opponentCard(o, load, trackerId));
-      refreshIcons();
+      view.listEl.innerHTML = `<div class="prep-error">${escapeHtml(err.message)}</div>`;
+      return;
     }
+    if (token !== mounted) return;
 
-    // Fetch the tracker and its opponents on open.
-    load();
+    prefs.set({ lastTrackerId: view.trackerId });
+    const { tracker, opponents } = data;
+    view.opponents = opponents;
+    wrap.querySelector('.ws-title').textContent = tracker.name;
+    wrap.querySelector('.ws-sub').textContent = [
+      tracker.event_date ? `${fmtDate(tracker.event_date)} · ${relDay(tracker.event_date)}` : null,
+      `${opponents.length} opponent${opponents.length === 1 ? '' : 's'}`,
+    ].filter(Boolean).join(' · ');
+
+    renderRoster();
+    // Explicit selection in the URL wins; otherwise reopen the last one viewed
+    // (desktop only — on a phone the roster is the natural landing view).
+    const remembered = prefs.lastOpponent(view.trackerId);
+    const wide = window.matchMedia('(min-width: 901px)').matches;
+    let initial = params.sub;
+    if (!initial && wide) initial = remembered && opponents.some((o) => String(o.id) === remembered) ? remembered : opponents[0]?.id;
+    if (!opponents.length) initial = 'new';
+    select(initial ? String(initial) : null, { replace: true });
+  },
+
+  // Same screen, different opponent in the URL (roster click, back button).
+  update(params = {}) {
+    if (!view) return;
+    if (params.id && String(params.id) !== view.trackerId) {
+      trackerScreen.unmount();
+      const root = document.getElementById('app');
+      root.innerHTML = '';
+      trackerScreen.mount(root, params);
+      return;
+    }
+    show(params.sub ? String(params.sub) : null);
+  },
+
+  unmount() {
+    mounted++;
+    view?.dossier?.destroy();
+    view = null;
   },
 };
 
-function opponentCard(o, reload, trackerId) {
-  const card = document.createElement('div');
-  card.className = 'opponent-card card';
-  const handles = [
-    o.chesscom ? `chess.com/${o.chesscom}` : null,
-    o.lichess ? `lichess/${o.lichess}` : null,
-    o.fide_id ? `FIDE ${o.fide_id}` : null,
-  ].filter(Boolean).join(' · ');
-
-  card.innerHTML = `
-    <div class="oc-head">
-      <div>
-        <button class="oc-name oc-open" title="Review ${escapeHtml(o.name)}'s games">${escapeHtml(o.name)}</button>
-        <div class="oc-handles">${escapeHtml(handles) || 'No accounts linked'}</div>
-      </div>
-      <div class="oc-actions">
-        <span class="oc-count mono">${o.game_count} game${o.game_count === 1 ? '' : 's'}</span>
-        <button class="btn btn-secondary oc-import">Import online</button>
-        <button class="btn btn-secondary oc-upload">Upload PGN</button>
-        <button class="btn btn-secondary oc-report-btn">Prep report</button>
-        <button class="btn btn-primary oc-games-btn" ${o.game_count ? '' : 'disabled title="No games yet"'}>
-          <i data-lucide="swords"></i> Review games
-        </button>
-        <button class="btn btn-ghost oc-remove" title="Remove"><i data-lucide="trash-2"></i></button>
-      </div>
-    </div>
-    <div class="oc-upload-box" hidden>
-      <textarea class="oc-pgn" rows="4" placeholder="Paste one or more games in PGN…"></textarea>
-      <button class="btn btn-primary oc-pgn-save">Save games</button>
-    </div>
-    <div class="oc-status"></div>
-    <div class="oc-report-panel" hidden></div>
-  `;
-
-  const statusEl = card.querySelector('.oc-status');
-  const reportEl = card.querySelector('.oc-report-panel');
-  const uploadBox = card.querySelector('.oc-upload-box');
-
-  const openReview = () => navigate('opponent', { id: o.id, trackerId });
-  card.querySelector('.oc-open').addEventListener('click', openReview);
-  const gamesBtn = card.querySelector('.oc-games-btn');
-  if (o.game_count) gamesBtn.addEventListener('click', openReview);
-
-  card.querySelector('.oc-remove').addEventListener('click', async () => {
-    if (!confirm(`Remove ${o.name}?`)) return;
-    await api(`/opponents/${o.id}`, { method: 'DELETE' });
-    reload();
-  });
-
-  card.querySelector('.oc-import').addEventListener('click', async () => {
-    statusEl.innerHTML = '<div class="scout-loading">Importing online games…</div>';
-    try {
-      const { imported, errors } = await api(`/opponents/${o.id}/import`, { method: 'POST' });
-      statusEl.innerHTML = `<div class="oc-ok">Imported ${imported} new game${imported === 1 ? '' : 's'}.${errors && errors.length ? ' ' + escapeHtml(errors.join('; ')) : ''}</div>`;
-      setTimeout(reload, 900);
-    } catch (err) {
-      statusEl.innerHTML = `<div class="scout-error">${err.message}</div>`;
-    }
-  });
-
-  card.querySelector('.oc-upload').addEventListener('click', () => {
-    uploadBox.hidden = !uploadBox.hidden;
-  });
-  card.querySelector('.oc-pgn-save').addEventListener('click', async () => {
-    const pgn = card.querySelector('.oc-pgn').value.trim();
-    if (!pgn) return;
-    statusEl.innerHTML = '<div class="scout-loading">Saving…</div>';
-    try {
-      const { imported } = await api(`/opponents/${o.id}/games`, { method: 'POST', body: { pgn } });
-      statusEl.innerHTML = `<div class="oc-ok">Saved ${imported} game${imported === 1 ? '' : 's'}.</div>`;
-      card.querySelector('.oc-pgn').value = '';
-      uploadBox.hidden = true;
-      setTimeout(reload, 900);
-    } catch (err) {
-      statusEl.innerHTML = `<div class="scout-error">${err.message}</div>`;
-    }
-  });
-
-  card.querySelector('.oc-report-btn').addEventListener('click', async () => {
-    if (!reportEl.hidden) {
-      reportEl.hidden = true;
-      return;
-    }
-    reportEl.hidden = false;
-    reportEl.innerHTML = '<div class="scout-loading">Building prep report…</div>';
-    try {
-      const report = await api(`/opponents/${o.id}/report`);
-      reportEl.innerHTML = renderReport(report);
-      refreshIcons();
-    } catch (err) {
-      reportEl.innerHTML = `<div class="scout-error">${err.message}</div>`;
-    }
-  });
-
-  return card;
-}
-
-function renderReport(r) {
-  if (!r.gameCount) {
-    return '<div class="op-empty">No games yet. Import online games or upload PGN to generate a prep report.</div>';
+// Change the selection by updating the URL; hashchange → update() → show().
+function select(sub, { replace = false } = {}) {
+  const hash = `#/tracker/${view.trackerId}${sub ? `/${sub}` : ''}`;
+  if (replace) {
+    history.replaceState(null, '', hash);
+    show(sub);
+  } else if (window.location.hash !== hash) {
+    window.location.hash = hash;
+  } else {
+    show(sub);
   }
-  const openingCol = (title, list) => `
-    <div class="op-col">
-      <h3 class="op-col-title">${title}</h3>
-      ${(list || []).map((o) => {
-        const w = o.count ? Math.round((o.win / o.count) * 100) : 0;
-        const dr = o.count ? Math.round((o.draw / o.count) * 100) : 0;
-        const l = 100 - w - dr;
-        return `<div class="op-row">
-          <div class="op-top"><span class="op-name">${escapeHtml(o.name)}</span><span class="op-count mono">${o.count}</span></div>
-          <div class="op-bar"><span class="op-seg win" style="width:${w}%"></span><span class="op-seg draw" style="width:${dr}%"></span><span class="op-seg loss" style="width:${l}%"></span></div>
-        </div>`;
-      }).join('') || '<div class="op-empty">—</div>'}
-    </div>`;
-
-  return `
-    <div class="report-summary">
-      <div class="rs-tags">${r.playstyle.tags.map((t) => `<span class="ps-tag">${escapeHtml(t)}</span>`).join('')}</div>
-      <p class="rs-text">${escapeHtml(r.playstyle.summary)}</p>
-      <div class="rs-stats mono">
-        <span class="rec win">${r.totals.win}W</span>
-        <span class="rec draw">${r.totals.draw}D</span>
-        <span class="rec loss">${r.totals.loss}L</span>
-        <span class="rs-sep">·</span>
-        <span>${r.drawRate}% draws</span>
-        ${r.avgPlies ? `<span class="rs-sep">·</span><span>~${Math.round(r.avgPlies / 2)} moves/game</span>` : ''}
-      </div>
-    </div>
-    <div class="dossier-cols">
-      ${openingCol('As White', r.openingsWhite)}
-      ${openingCol('As Black', r.openingsBlack)}
-    </div>
-    <div class="prep-block">
-      <h3 class="op-col-title">What to prepare</h3>
-      <ul class="prep-list">
-        ${r.prep.map((p) => `<li><i data-lucide="check"></i><span>${escapeHtml(p)}</span></li>`).join('')}
-      </ul>
-    </div>
-  `;
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-  ));
+function show(sub) {
+  if (!view) return;
+  if (sub === view.selected && sub !== 'new') return;
+  view.selected = sub;
+  view.dossier?.destroy();
+  view.dossier = null;
+  view.layout.dataset.view = sub ? 'detail' : 'roster';
+  highlightRoster();
+
+  if (!sub) {
+    view.mainEl.innerHTML = view.opponents.length
+      ? `<div class="prep-empty ws-pick"><i data-lucide="mouse-pointer-click"></i><h3>Pick an opponent</h3><p>Their notes, repertoire and games open here.</p></div>`
+      : '';
+    refreshIcons();
+    return;
+  }
+
+  if (sub === 'new') {
+    const holder = document.createElement('div');
+    holder.className = 'ws-form';
+    view.mainEl.innerHTML = '';
+    view.mainEl.appendChild(holder);
+    renderOpponentForm(holder, {
+      title: view.opponents.length ? 'Add an opponent' : 'Add your first opponent',
+      submitLabel: 'Add opponent',
+      onCancel: view.opponents.length ? () => select(prefs.lastOpponent(view.trackerId) || null) : null,
+      onSubmit: async (values) => {
+        const { opponent } = await api(`/trackers/${view.trackerId}/opponents`, { method: 'POST', body: values });
+        view.opponents.push({ ...opponent, game_count: 0, note_count: 0 });
+        renderRoster();
+        updateSub();
+        select(String(opponent.id));
+      },
+    });
+    return;
+  }
+
+  prefs.setLastOpponent(view.trackerId, sub);
+  view.mainEl.innerHTML = '';
+  const holder = document.createElement('div');
+  view.mainEl.appendChild(holder);
+  view.dossier = createDossier(holder, {
+    opponentId: sub,
+    onBack: () => select(null),
+    onChanged: (o) => {
+      const i = view?.opponents.findIndex((x) => String(x.id) === String(o.id));
+      if (i == null || i < 0) return;
+      view.opponents[i] = { ...view.opponents[i], ...o };
+      renderRoster();
+    },
+    onRemoved: () => {
+      view.opponents = view.opponents.filter((x) => String(x.id) !== sub);
+      prefs.setLastOpponent(view.trackerId, null);
+      renderRoster();
+      updateSub();
+      select(view.opponents.length ? null : 'new');
+    },
+  });
+  if (window.matchMedia('(max-width: 900px)').matches) window.scrollTo(0, 0);
+}
+
+function updateSub() {
+  const sub = view.wrap.querySelector('.ws-sub');
+  const n = view.opponents.length;
+  sub.textContent = sub.textContent.replace(/\d+ opponents?$/, `${n} opponent${n === 1 ? '' : 's'}`);
+}
+
+function renderRoster() {
+  const { listEl, opponents, filter } = view;
+  if (!opponents.length) {
+    listEl.innerHTML = '<div class="rs-empty">No opponents yet. Add the players you might face: pairings, the top seeds, your club rivals.</div>';
+    return;
+  }
+  const shown = opponents
+    .filter((o) => !filter || o.name.toLowerCase().includes(filter))
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0) || a.name.localeCompare(b.name));
+  if (!shown.length) {
+    listEl.innerHTML = `<div class="rs-empty">No one matches “${escapeHtml(filter)}”.</div>`;
+    return;
+  }
+  listEl.innerHTML = '';
+  for (const o of shown) {
+    const item = document.createElement('a');
+    item.className = 'rs-item';
+    item.role = 'listitem';
+    item.href = `#/tracker/${view.trackerId}/${o.id}`;
+    item.dataset.id = o.id;
+    const meta = [
+      o.game_count ? `${o.game_count} game${o.game_count === 1 ? '' : 's'}` : null,
+      o.note_count ? `${o.note_count} note${o.note_count === 1 ? '' : 's'}` : null,
+    ].filter(Boolean).join(' · ') || (o.chesscom || o.lichess || o.cfc_id ? 'Linked' : 'No accounts yet');
+    item.innerHTML = `
+      <span class="rs-avatar">${escapeHtml(initials(o.name))}</span>
+      <span class="rs-body">
+        <span class="rs-name">${escapeHtml(o.name)}</span>
+        <span class="rs-meta">${escapeHtml(meta)}</span>
+      </span>
+      ${o.rating ? `<span class="rs-rating mono">${o.rating}</span>` : ''}
+      <i data-lucide="chevron-right" class="rs-go"></i>`;
+    listEl.appendChild(item);
+  }
+  highlightRoster();
+  refreshIcons();
+}
+
+function highlightRoster() {
+  for (const a of view.listEl.querySelectorAll('.rs-item')) {
+    const on = a.dataset.id === view.selected;
+    a.classList.toggle('active', on);
+    if (on) a.setAttribute('aria-current', 'true');
+    else a.removeAttribute('aria-current');
+  }
 }

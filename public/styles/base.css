@@ -187,6 +187,9 @@ button {
   flex: 1;
   display: flex;
   flex-direction: column;
+  /* Decorative bleed (e.g. the home board glow) must never widen the page;
+     clip (not hidden) so sticky children keep working. */
+  overflow-x: clip;
 }
 main#app {
   flex: 1;
@@ -264,7 +267,8 @@ main#app {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 9px var(--space-3);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
   border: none;
   background: none;
   border-radius: var(--radius-md);
@@ -385,8 +389,9 @@ main#app {
 .sb-toggle {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
+  margin-left: calc(-1 * var(--space-1));
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -498,6 +503,12 @@ main#app {
   width: 15px;
   height: 15px;
 }
+/* Touch: give inline text buttons a finger-sized hit area without moving text. */
+@media (pointer: coarse) {
+  .text-link {
+    min-height: 40px;
+  }
+}
 
 /* ---------------- Cards + primitives ---------------- */
 .card {
@@ -572,10 +583,27 @@ main#app {
     position: fixed;
     left: 0;
     top: 0;
+    width: min(280px, 84vw);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     transform: translateX(-100%);
-    transition: transform var(--dur-base) var(--ease-standard);
+    /* Hidden (not just off-screen) while closed so its links can't be tabbed to. */
+    visibility: hidden;
+    transition: transform var(--dur-mid) var(--ease-standard),
+      visibility 0s linear var(--dur-mid);
   }
-  .sidebar[data-open="true"] { transform: translateX(0); }
+  .sidebar[data-open="true"] {
+    transform: translateX(0);
+    visibility: visible;
+    box-shadow: var(--shadow-lg);
+    transition: transform var(--dur-mid) var(--ease-standard);
+  }
   .sidebar[data-open="true"] ~ .sb-scrim { display: block; }
+  .sb-link { min-height: 44px; }
+  body.nav-open { overflow: hidden; }
   .screen { padding: var(--space-5) var(--space-4); }
+  h1 { font-size: 26px; }
+}
+@media (max-width: 480px) {
+  .screen { padding: var(--space-4) var(--space-4) var(--space-6); }
 }

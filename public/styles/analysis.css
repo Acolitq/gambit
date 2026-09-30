@@ -13,20 +13,30 @@
 }
 
 .analysis-screen {
+  /* Size container: see .game-screen. The board shares the row with the eval
+     bar (24px + 8px gap) and sits beside a 340px column. */
+  container-type: inline-size;
+  --eval-gutter: 32px;
+  --board-size: min(
+    600px,
+    calc(100cqi - 340px - var(--space-5) - var(--eval-gutter)),
+    calc(100dvh - 130px)
+  );
   display: flex;
-  gap: 24px;
+  gap: var(--space-5);
   align-items: flex-start;
   justify-content: center;
-  padding-top: 24px;
+  padding-top: var(--space-5);
 }
 .analysis-main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
+  min-width: 0;
 }
 .board-row {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: stretch;
 }
 .eval-bar-host {
@@ -62,10 +72,10 @@
   text-align: center;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   color: var(--eb-white);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
 }
 .eval-bar.white-ahead .eb-label {
   top: auto;
@@ -82,7 +92,8 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
-  padding: 12px;
+  padding: var(--space-3);
+  min-width: 0;
 }
 .engine-head {
   display: flex;
@@ -165,10 +176,12 @@
 .el-eval {
   font-weight: 600;
   min-width: 44px;
+  flex-shrink: 0;
 }
 .el-eval.pos { color: var(--text-primary); }
 .el-eval.neg { color: var(--text-secondary); }
 .el-moves {
+  min-width: 0;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -176,12 +189,12 @@
 }
 .review-controls {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   justify-content: center;
 }
 .nav-btn {
-  width: 40px;
-  height: 38px;
+  width: 44px;
+  height: 40px;
   padding: 0;
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -203,14 +216,17 @@
 
 .analysis-side {
   width: 340px;
+  flex-shrink: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 .analysis-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
 }
 .analysis-header h2 {
   font-size: 22px;
@@ -237,9 +253,10 @@
 }
 .import-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .depth-label {
   font-size: 13px;
@@ -250,7 +267,8 @@
 }
 .depth-select {
   font-family: var(--font-body);
-  padding: 6px 8px;
+  height: 36px;
+  padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -311,7 +329,7 @@
 /* Accuracy */
 .accuracy-block {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .acc-side {
   flex: 1;
@@ -399,15 +417,16 @@
 .analysis-move-list {
   background: var(--surface-alt);
   border-radius: var(--radius-panel);
-  padding: 8px;
+  padding: var(--space-2);
   max-height: 300px;
+  overscroll-behavior: contain;
   overflow-y: auto;
   font-family: var(--font-mono);
   font-size: 14px;
 }
 .amove-row {
   display: grid;
-  grid-template-columns: 32px 1fr 1fr;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr);
   gap: 4px;
   align-items: center;
 }
@@ -459,13 +478,37 @@
 .q-mistake .amove-san { color: var(--verdict-mistake); }
 .q-blunder .amove-san { color: var(--verdict-blunder); }
 
-@media (max-width: 720px) {
+/* Stack below 1180px (same breakpoint as the game screen). */
+@media (max-width: 1180px) {
   .analysis-screen {
+    --board-size: min(600px, calc(100cqi - var(--eval-gutter)), max(300px, calc(100dvh - 200px)));
     flex-direction: column;
     align-items: center;
+    gap: var(--space-4);
   }
   .analysis-side {
-    width: min(640px, 90vw);
+    width: calc(var(--board-size) + var(--eval-gutter));
+  }
+}
+@media (max-width: 560px) {
+  .analysis-screen {
+    --eval-gutter: 28px;
+    padding-top: var(--space-3);
+  }
+  .analysis-screen .board-row {
+    gap: 6px;
+  }
+  .analysis-screen .eval-bar {
+    width: 22px;
+  }
+  .analysis-screen .eb-label {
+    font-size: 8.5px;
+  }
+}
+/* Touch: taller move cells and engine lines so they're easy to tap. */
+@media (pointer: coarse) {
+  .amove {
+    min-height: 36px;
   }
 }
 
