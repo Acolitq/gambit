@@ -1,61 +1,86 @@
 import { Chess } from 'chess.js';
-import { navigate } from '../router.js';
+import { navigate, refreshIcons } from '../router.js';
 import { createBoard } from '../ui/board.js';
 import { getEngine } from '../analysis/engineSingleton.js';
 import { formatEval, numberedLine } from '../analysis/evalFormat.js';
 
-// Openings trainer: an explore board where every legal move is allowed, the
-// current position is named live from the lichess openings dataset, popular
-// continuations are offered, and a curated grid of common openings can be played
-// out move by move.
+// Openings: a horizontally scrolling strip of well-known openings across the
+// top. Picking one loads its main line and resets the board to the starting
+// position; → / ← (or the buttons) then step through that line only. Moves
+// played by hand on the board branch off into free exploration — the position
+// is still named live from the lichess dataset, with popular continuations and
+// a live engine.
 export const openingsScreen = {
   async mount(root) {
     const wrap = document.createElement('div');
     wrap.className = 'screen openings-screen';
     wrap.innerHTML = `
-      <div class="openings-main">
-        <div class="board-host"></div>
-        <div class="review-controls">
-          <button class="btn btn-ghost nav-btn" data-nav="back" title="Back one move (←)" aria-label="Back one move"><i data-lucide="chevron-left"></i></button>
-          <button class="btn btn-ghost nav-btn" data-nav="reset" title="Reset">Reset</button>
-          <button class="btn btn-ghost nav-btn" data-nav="flip" title="Flip" aria-label="Flip board"><i data-lucide="arrow-up-down"></i></button>
+      <div class="scout-head openings-head">
+        <div>
+          <h1>Openings</h1>
+          <p class="scout-tagline">Pick an opening, then step through its main line with the arrow buttons or ← →.</p>
         </div>
+        <button class="text-link back-link"><i data-lucide="arrow-left"></i> Menu</button>
       </div>
-      <aside class="openings-side">
-        <div class="analysis-header">
-          <h2>Openings</h2>
-          <button class="text-link back-link"><i data-lucide="arrow-left"></i> Menu</button>
-        </div>
-        <div class="current-opening">
-          <div class="co-eco">—</div>
-          <div class="co-name">Start position</div>
-          <div class="co-moves"></div>
-        </div>
-        <div class="engine-panel">
-          <div class="engine-head">
-            <span class="engine-title">Engine</span>
-            <span class="engine-depth"></span>
+
+      <section class="ol-strip-wrap" aria-label="Openings">
+        <div class="ol-strip-head">
+          <span class="section-label">Main lines</span>
+          <div class="ol-strip-arrows">
+            <button class="ol-strip-arrow" data-scroll="-1" aria-label="Scroll openings left"><i data-lucide="chevron-left"></i></button>
+            <button class="ol-strip-arrow" data-scroll="1" aria-label="Scroll openings right"><i data-lucide="chevron-right"></i></button>
           </div>
-          <div class="engine-lines"></div>
         </div>
-        <div class="continuations">
-          <h3 class="side-h3">Continuations</h3>
-          <div class="cont-list"></div>
-        </div>
-        <div class="opening-info">
-          <h3 class="side-h3">About this opening</h3>
-          <p class="oi-desc">Play a move to see the opening named, a short description, and its main line.</p>
-          <div class="oi-mainline-wrap" hidden>
-            <div class="oi-label">Main line</div>
-            <div class="oi-mainline mono"></div>
+        <div class="ol-strip"></div>
+      </section>
+
+      <div class="openings-body">
+        <div class="openings-main">
+          <div class="board-host"></div>
+          <div class="review-controls">
+            <button class="btn btn-ghost nav-btn" data-nav="start" title="Start (Home)" aria-label="Go to start"><i data-lucide="chevrons-left"></i></button>
+            <button class="btn btn-ghost nav-btn" data-nav="prev" title="Previous move (←)" aria-label="Previous move"><i data-lucide="chevron-left"></i></button>
+            <button class="btn btn-ghost nav-btn" data-nav="next" title="Next move (→)" aria-label="Next move"><i data-lucide="chevron-right"></i></button>
+            <button class="btn btn-ghost nav-btn" data-nav="end" title="End of line (End)" aria-label="Go to end of line"><i data-lucide="chevrons-right"></i></button>
+            <button class="btn btn-ghost nav-btn" data-nav="flip" title="Flip" aria-label="Flip board"><i data-lucide="arrow-up-down"></i></button>
           </div>
         </div>
 
-        <div class="basics">
-          <h3 class="side-h3">Common openings</h3>
-          <div class="basics-grid"></div>
-        </div>
-      </aside>
+        <aside class="ol-side">
+          <div class="ol-card">
+            <div class="ol-card-eco">—</div>
+            <div class="ol-card-name">Choose an opening</div>
+            <div class="ol-card-var"></div>
+            <p class="ol-card-desc">Pick one from the strip above to step through its main line. You can also play moves on the board to explore freely.</p>
+            <div class="ol-live" hidden><span class="ol-live-label">Position</span> <span class="ol-live-name"></span></div>
+          </div>
+
+          <div class="ol-moves-panel">
+            <div class="ol-moves-head">
+              <span class="engine-title">Moves</span>
+              <span class="ol-counter mono"></span>
+            </div>
+            <div class="ol-moves"></div>
+            <div class="ol-offline" hidden>
+              <span class="ol-offline-text"></span>
+              <button class="text-link ol-offline-back">Back to line</button>
+            </div>
+          </div>
+
+          <div class="engine-panel">
+            <div class="engine-head">
+              <span class="engine-title">Engine</span>
+              <span class="engine-depth"></span>
+            </div>
+            <div class="engine-lines"></div>
+          </div>
+
+          <div class="continuations">
+            <h3 class="side-h3">Continuations</h3>
+            <div class="cont-list"></div>
+          </div>
+        </aside>
+      </div>
     `;
     root.appendChild(wrap);
 
@@ -68,15 +93,23 @@ export const openingsScreen = {
         fetch('/data/openings-basics.json').then((r) => r.json()),
       ]);
     } catch {
-      wrap.querySelector('.co-name').textContent = 'Could not load opening data.';
+      wrap.querySelector('.ol-card-desc').textContent = 'Could not load opening data.';
     }
+    // The user may have navigated away while the data was loading.
+    if (!wrap.isConnected) return;
+
     // Index by exact SAN sequence for O(1) name lookup.
     const byLine = new Map();
     for (const o of openings) byLine.set(o.san.join(' '), o);
 
-    const chess = new Chess();
+    // State: the selected opening's main line, how far along it the board is
+    // (`cursor`, in plies), and any moves played by hand from that point.
+    let selected = -1;
+    let line = [];
+    let cursor = 0;
+    let extra = [];
     let orientation = 'w';
-    let sanHistory = [];
+    const chess = new Chess();
 
     const board = createBoard({
       mount: wrap.querySelector('.board-host'),
@@ -88,8 +121,6 @@ export const openingsScreen = {
         return chess.moves({ square: sq, verbose: true }).map((m) => m.to);
       },
     });
-    // Show the starting pieces immediately.
-    board.setPosition(chess.fen());
 
     // Live engine for the current position (eval + best lines).
     const engineDepthEl = wrap.querySelector('.engine-depth');
@@ -111,65 +142,138 @@ export const openingsScreen = {
         });
     }
     function renderEngineLines(lines, fen) {
-      if (!lines.length) return;
+      // Ignore late results for a position we've already stepped away from.
+      if (!lines.length || fen !== chess.fen()) return;
       engineDepthEl.textContent = `depth ${lines[0].depth}`;
       engineLinesEl.innerHTML = '';
-      for (const line of lines) {
-        const sans = pvToSan(fen, line.pv, 6);
+      for (const l of lines) {
+        const sans = pvToSan(fen, l.pv, 6);
         const row = document.createElement('div');
         row.className = 'engine-line';
-        const positive = (line.mate ?? line.scoreCp ?? 0) >= 0;
+        const positive = (l.mate ?? l.scoreCp ?? 0) >= 0;
         row.innerHTML = `
-          <span class="el-eval ${positive ? 'pos' : 'neg'}">${formatEval({ scoreCp: line.scoreCp, mate: line.mate })}</span>
+          <span class="el-eval ${positive ? 'pos' : 'neg'}">${formatEval({ scoreCp: l.scoreCp, mate: l.mate })}</span>
           <span class="el-moves">${numberedLine(fen, sans)}</span>
         `;
         engineLinesEl.appendChild(row);
       }
     }
 
-    function play(move) {
-      const res = chess.move(move);
-      if (!res) return;
-      sanHistory.push(res.san);
+    // --- Opening strip ---
+    const strip = wrap.querySelector('.ol-strip');
+    basics.forEach((o, i) => {
+      const chip = document.createElement('button');
+      chip.className = 'ol-chip';
+      chip.setAttribute('aria-pressed', 'false');
+      chip.innerHTML = `
+        <span class="ol-chip-eco">${o.eco}</span>
+        <span class="ol-chip-name">${o.name}</span>
+        <span class="ol-chip-var">${o.variation || ''}</span>
+        <span class="ol-chip-moves">${numberedLine(START_FEN_FULL, o.san.slice(0, 6))}</span>
+      `;
+      chip.addEventListener('click', () => select(i));
+      strip.appendChild(chip);
+    });
+
+    // Scroll only the strip (not the page) so the chip sits in the middle.
+    function scrollChipIntoView(chip) {
+      const left = chip.offsetLeft - (strip.clientWidth - chip.offsetWidth) / 2;
+      strip.scrollTo({ left: Math.max(0, left), behavior: reducedMotion() ? 'auto' : 'smooth' });
+    }
+
+    const arrowBtns = wrap.querySelectorAll('.ol-strip-arrow');
+    function syncArrows() {
+      const max = strip.scrollWidth - strip.clientWidth - 1;
+      const atStart = strip.scrollLeft <= 0;
+      const atEnd = strip.scrollLeft >= max;
+      arrowBtns[0].disabled = atStart;
+      arrowBtns[1].disabled = atEnd;
+      strip.classList.toggle('fade-left', !atStart);
+      strip.classList.toggle('fade-right', !atEnd);
+    }
+    for (const btn of arrowBtns) {
+      btn.addEventListener('click', () => {
+        const dir = Number(btn.dataset.scroll);
+        strip.scrollBy({ left: dir * strip.clientWidth * 0.8, behavior: reducedMotion() ? 'auto' : 'smooth' });
+      });
+    }
+    strip.addEventListener('scroll', syncArrows, { passive: true });
+    this._onResize = syncArrows;
+    window.addEventListener('resize', this._onResize);
+
+    function select(i) {
+      selected = i;
+      line = basics[i].san;
+      extra = [];
+      [...strip.children].forEach((chip, j) => {
+        chip.classList.toggle('active', j === i);
+        chip.setAttribute('aria-pressed', String(j === i));
+      });
+      scrollChipIntoView(strip.children[i]);
+      goTo(0);
+    }
+
+    // --- Position ---
+    // Rebuild the board from the line prefix plus any hand-played moves.
+    function render() {
+      chess.reset();
+      for (const san of [...line.slice(0, cursor), ...extra]) chess.move(san);
       board.setPosition(chess.fen());
-      board.highlightLastMove(res.from, res.to);
+      const last = chess.history({ verbose: true }).slice(-1)[0];
+      // No move yet: passing nulls clears the last-move highlight.
+      if (last) board.highlightLastMove(last.from, last.to);
+      else board.highlightLastMove(null, null);
+      board.clearCheck();
+      if (chess.inCheck()) board.flashCheck(kingSquare(chess, chess.turn()));
       update();
     }
 
-    function loadLine(sanArr) {
-      chess.reset();
-      sanHistory = [];
-      for (const san of sanArr) {
-        const res = chess.move(san);
-        if (!res) break;
-        sanHistory.push(res.san);
+    // Jump to a ply of the selected line (clamped to the line), dropping any
+    // exploration.
+    function goTo(ply) {
+      cursor = Math.max(0, Math.min(line.length, ply));
+      extra = [];
+      render();
+    }
+
+    function prev() {
+      if (extra.length) {
+        extra.pop();
+        render();
+      } else if (cursor > 0) {
+        goTo(cursor - 1);
       }
-      board.setPosition(chess.fen());
-      if (sanHistory.length) {
-        const last = chess.history({ verbose: true }).slice(-1)[0];
-        board.highlightLastMove(last.from, last.to);
+    }
+
+    // A move made on the board (or from the continuations list). Playing the
+    // line's next move just advances along it; anything else is exploration.
+    function play(move) {
+      let res;
+      try {
+        res = chess.move(move);
+      } catch {
+        return;
       }
-      update();
+      if (!res) return;
+      if (!extra.length && cursor < line.length && res.san === line[cursor]) cursor += 1;
+      else extra.push(res.san);
+      render();
     }
 
     // Deepest named line that is a prefix of the current moves.
-    function currentOpening() {
-      let best = null;
-      for (let n = sanHistory.length; n >= 1; n--) {
-        const hit = byLine.get(sanHistory.slice(0, n).join(' '));
-        if (hit) {
-          best = hit;
-          break;
-        }
+    function currentOpening(history) {
+      for (let n = history.length; n >= 1; n--) {
+        const hit = byLine.get(history.slice(0, n).join(' '));
+        if (hit) return hit;
       }
-      return best;
+      return null;
     }
 
     // Named continuations: openings that extend the current line by at least one
     // move, grouped by the next move played.
-    function continuations() {
-      const prefix = sanHistory.join(' ');
-      const depth = sanHistory.length;
+    function continuations(history) {
+      const prefix = history.join(' ');
+      const depth = history.length;
       const byNext = new Map();
       for (const o of openings) {
         if (o.san.length <= depth) continue;
@@ -182,29 +286,51 @@ export const openingsScreen = {
         .slice(0, 10);
     }
 
-    const oiDesc = wrap.querySelector('.oi-desc');
-    const oiMlWrap = wrap.querySelector('.oi-mainline-wrap');
-    const oiMl = wrap.querySelector('.oi-mainline');
+    const cardEco = wrap.querySelector('.ol-card-eco');
+    const cardName = wrap.querySelector('.ol-card-name');
+    const cardVar = wrap.querySelector('.ol-card-var');
+    const cardDesc = wrap.querySelector('.ol-card-desc');
+    const liveEl = wrap.querySelector('.ol-live');
+    const liveName = wrap.querySelector('.ol-live-name');
+    const movesEl = wrap.querySelector('.ol-moves');
+    const counterEl = wrap.querySelector('.ol-counter');
+    const offlineEl = wrap.querySelector('.ol-offline');
+    const offlineText = wrap.querySelector('.ol-offline-text');
+    const navBtn = (name) => wrap.querySelector(`[data-nav="${name}"]`);
 
     function update() {
-      const co = currentOpening();
-      wrap.querySelector('.co-eco').textContent = co ? co.eco : '—';
-      wrap.querySelector('.co-name').textContent = co ? co.name : 'Start position';
-      wrap.querySelector('.co-moves').textContent = formatMoves(sanHistory);
+      const history = [...line.slice(0, cursor), ...extra];
+      const co = currentOpening(history);
 
-      // Description + main line for the current opening.
-      if (co) {
-        oiDesc.textContent = describeOpening(co);
-        oiMl.textContent = numberedLine(START_FEN_FULL, co.san);
-        oiMlWrap.hidden = false;
+      // Opening card: the selected line, or whatever the explored position is.
+      if (selected >= 0) {
+        const o = basics[selected];
+        cardEco.textContent = o.eco;
+        cardName.textContent = o.name;
+        cardVar.textContent = o.variation || '';
+        cardDesc.textContent = o.desc || describeOpening(o);
       } else {
-        oiDesc.textContent = 'Play a move to see the opening named, a short description, and its main line.';
-        oiMlWrap.hidden = true;
+        cardEco.textContent = co ? co.eco : '—';
+        cardName.textContent = co ? co.name : 'Choose an opening';
+        cardVar.textContent = '';
+        cardDesc.textContent = co
+          ? describeOpening(co)
+          : 'Pick one from the strip above to step through its main line. You can also play moves on the board to explore freely.';
       }
+      liveEl.hidden = !(selected >= 0 && co);
+      if (co) liveName.textContent = `${co.name} (${co.eco})`;
+
+      renderMoves();
+
+      // Nav state: stepping stays inside the selected line.
+      navBtn('start').disabled = cursor === 0 && !extra.length;
+      navBtn('prev').disabled = cursor === 0 && !extra.length;
+      navBtn('next').disabled = cursor >= line.length;
+      navBtn('end').disabled = cursor >= line.length && !extra.length;
 
       const contEl = wrap.querySelector('.cont-list');
       contEl.innerHTML = '';
-      const conts = continuations();
+      const conts = continuations(history);
       if (!conts.length) {
         contEl.innerHTML = '<div class="op-empty">No named continuations — you\'re out of book.</div>';
       }
@@ -219,6 +345,54 @@ export const openingsScreen = {
       runEngine(chess.fen());
     }
 
+    // The selected line as clickable moves: the current ply is highlighted,
+    // moves still to come are dimmed.
+    function renderMoves() {
+      movesEl.innerHTML = '';
+      counterEl.textContent = line.length ? `${cursor} / ${line.length}` : '';
+      if (!line.length) {
+        movesEl.innerHTML = '<div class="op-empty">Choose an opening to see its main line.</div>';
+      }
+      for (let i = 0; i < line.length; i += 2) {
+        const row = document.createElement('div');
+        row.className = 'ol-move-row';
+        const num = document.createElement('span');
+        num.className = 'ol-move-num';
+        num.textContent = `${i / 2 + 1}.`;
+        row.appendChild(num);
+        for (const ply of [i, i + 1]) {
+          if (ply >= line.length) break;
+          const btn = document.createElement('button');
+          btn.className = 'ol-move';
+          if (ply + 1 === cursor) btn.classList.add(extra.length ? 'branch' : 'active');
+          if (ply + 1 > cursor) btn.classList.add('upcoming');
+          btn.textContent = line[ply];
+          btn.addEventListener('click', () => goTo(ply + 1));
+          row.appendChild(btn);
+        }
+        movesEl.appendChild(row);
+      }
+      const active = movesEl.querySelector('.active, .branch');
+      if (active) {
+        // Keep the current move visible without scrolling the page (the list
+        // is the offsetParent, so offsetTop is relative to it).
+        const top = active.offsetTop;
+        if (top < movesEl.scrollTop || top + active.offsetHeight > movesEl.scrollTop + movesEl.clientHeight) {
+          movesEl.scrollTop = top - movesEl.clientHeight / 2;
+        }
+      } else {
+        movesEl.scrollTop = 0;
+      }
+
+      offlineEl.hidden = !extra.length;
+      if (extra.length) {
+        const base = new Chess();
+        for (const san of line.slice(0, cursor)) base.move(san);
+        offlineText.textContent = `${line.length ? 'Off the line' : 'Exploring'}: ${numberedLine(base.fen(), extra)}`;
+      }
+      wrap.querySelector('.ol-offline-back').hidden = !line.length;
+    }
+
     // Convert a SAN string into a move object chess.js can apply from here.
     function sanToMove(san) {
       const legal = chess.moves({ verbose: true });
@@ -226,44 +400,47 @@ export const openingsScreen = {
       return hit ? { from: hit.from, to: hit.to, promotion: hit.promotion } : san;
     }
 
-    // Render the curated grid.
-    const grid = wrap.querySelector('.basics-grid');
-    for (const b of basics) {
-      const btn = document.createElement('button');
-      btn.className = 'basic-btn';
-      btn.innerHTML = `<span class="basic-eco">${b.eco}</span><span class="basic-name">${b.name}</span>`;
-      btn.addEventListener('click', () => loadLine(b.san));
-      grid.appendChild(btn);
-    }
-
     // Controls
-    wrap.querySelector('[data-nav="back"]').addEventListener('click', () => {
-      if (!sanHistory.length) return;
-      chess.undo();
-      sanHistory.pop();
-      board.setPosition(chess.fen());
-      const last = chess.history({ verbose: true }).slice(-1)[0];
-      if (last) board.highlightLastMove(last.from, last.to);
-      update();
-    });
-    wrap.querySelector('[data-nav="reset"]').addEventListener('click', () => loadLine([]));
-    wrap.querySelector('[data-nav="flip"]').addEventListener('click', () => {
+    navBtn('start').addEventListener('click', () => goTo(0));
+    navBtn('prev').addEventListener('click', prev);
+    navBtn('next').addEventListener('click', () => goTo(cursor + 1));
+    navBtn('end').addEventListener('click', () => goTo(line.length));
+    navBtn('flip').addEventListener('click', () => {
       orientation = orientation === 'w' ? 'b' : 'w';
+      // Rebuilding the board keeps the pieces and last-move highlight.
       board.setOrientation(orientation);
-      board.setPosition(chess.fen());
+      if (chess.inCheck()) board.flashCheck(kingSquare(chess, chess.turn()));
     });
+    wrap.querySelector('.ol-offline-back').addEventListener('click', () => goTo(cursor));
     wrap.querySelector('.back-link').addEventListener('click', () => navigate('menu'));
 
     this._onKey = (e) => {
-      if (e.key === 'ArrowLeft') wrap.querySelector('[data-nav="back"]').click();
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const actions = {
+        ArrowLeft: prev,
+        ArrowRight: () => goTo(cursor + 1),
+        Home: () => goTo(0),
+        End: () => goTo(line.length),
+      };
+      const action = actions[e.key];
+      // Nothing loaded: leave the keys to the browser (e.g. Home/End scroll).
+      if (!action || (!line.length && !extra.length)) return;
+      e.preventDefault();
+      action();
     };
     window.addEventListener('keydown', this._onKey);
 
-    update();
+    refreshIcons();
+    render();
+    syncArrows();
   },
 
   unmount() {
     if (this._onKey) window.removeEventListener('keydown', this._onKey);
+    if (this._onResize) window.removeEventListener('resize', this._onResize);
+    this._onKey = null;
+    this._onResize = null;
     try {
       getEngine().stop();
     } catch {
@@ -274,8 +451,21 @@ export const openingsScreen = {
 
 const START_FEN_FULL = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
+function reducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function kingSquare(chess, color) {
+  for (const row of chess.board()) {
+    for (const p of row) {
+      if (p && p.type === 'k' && p.color === color) return p.square;
+    }
+  }
+  return null;
+}
+
 // Short, factual blurbs for the most common openings, matched on the opening
-// name. Anything not listed gets a sensible generated description.
+// name. Used while exploring freely; the curated lines carry their own text.
 const DESCRIPTIONS = [
   ['sicilian', "Black meets 1.e4 with 1...c5, fighting for the centre asymmetrically. It's the most popular and most combative answer to e4, giving sharp, unbalanced middlegames."],
   ['french', 'After 1.e4 e6 Black builds a solid pawn chain and strikes with ...d5. Reliable and strategic, though the light-squared bishop can be hard to free.'],
@@ -304,7 +494,7 @@ function describeOpening(o) {
   for (const [key, text] of DESCRIPTIONS) {
     if (name.includes(key)) return text;
   }
-  return `The ${o.name} (${o.eco}) arises after ${numberedLine(START_FEN_FULL, o.san)}. From here both sides follow well-mapped plans — try the continuations above to see how the main lines branch.`;
+  return `The ${o.name} (${o.eco}) arises after ${numberedLine(START_FEN_FULL, o.san)}. From here both sides follow well-mapped plans — try the continuations below to see how the main lines branch.`;
 }
 
 // Convert a UCI principal variation into SAN, played from `fen`, capped at `max`.
@@ -312,21 +502,18 @@ function pvToSan(fen, uciMoves, max) {
   const chess = new Chess(fen);
   const out = [];
   for (const uci of (uciMoves || []).slice(0, max)) {
-    const res = chess.move({
-      from: uci.slice(0, 2),
-      to: uci.slice(2, 4),
-      promotion: uci.length > 4 ? uci.slice(4, 5) : undefined,
-    });
+    let res;
+    try {
+      res = chess.move({
+        from: uci.slice(0, 2),
+        to: uci.slice(2, 4),
+        promotion: uci.length > 4 ? uci.slice(4, 5) : undefined,
+      });
+    } catch {
+      break;
+    }
     if (!res) break;
     out.push(res.san);
   }
   return out;
-}
-
-function formatMoves(sanArr) {
-  let out = '';
-  for (let i = 0; i < sanArr.length; i += 2) {
-    out += `${i / 2 + 1}. ${sanArr[i]} ${sanArr[i + 1] || ''} `;
-  }
-  return out.trim();
 }
