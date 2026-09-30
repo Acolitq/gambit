@@ -32,7 +32,7 @@ const NAV = [
   { route: 'menu', label: 'Home', icon: 'layout-dashboard' },
   { route: 'analysis', label: 'Review lab', icon: 'search' },
   { route: 'scout', label: 'Scout', icon: 'crosshair' },
-  { route: 'openings', label: 'Repertoire', icon: 'network' },
+  { route: 'openings', label: 'Openings', icon: 'network' },
   { route: 'trackers', label: 'Events', icon: 'calendar-days' },
   { route: 'setup', label: 'Practice', icon: 'swords' },
 ];
