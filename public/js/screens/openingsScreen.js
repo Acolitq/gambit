@@ -139,6 +139,11 @@ export const openingsScreen = {
         .then((lines) => {
           engineLinesEl.classList.remove('thinking');
           renderEngineLines(lines, fen);
+        })
+        .catch(() => {
+          engineLinesEl.classList.remove('thinking');
+          engineDepthEl.textContent = '';
+          engineLinesEl.textContent = 'Engine unavailable.';
         });
     }
     function renderEngineLines(lines, fen) {
