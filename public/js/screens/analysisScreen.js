@@ -4,7 +4,7 @@ import { store } from '../store.js';
 import { createBoard } from '../ui/board.js';
 import { createEvalGraph } from '../analysis/evalGraph.js';
 import { createEvalBar } from '../analysis/evalBar.js';
-import { analyzeGame } from '../analysis/analyzer.js';
+import { analyzeGame, parseGame } from '../analysis/analyzer.js';
 import { getCachedAnalysis, setCachedAnalysis } from '../analysis/analysisCache.js';
 import { getEngine } from '../analysis/engineSingleton.js';
 import { formatEval, numberedLine } from '../analysis/evalFormat.js';
@@ -13,7 +13,10 @@ import { formatEval, numberedLine } from '../analysis/evalFormat.js';
 const LIVE_DEPTH = 22;
 const LIVE_MULTIPV = 3;
 
-// A sample game so the page is never empty (Morphy's "Opera Game", 1858).
+// Shown in the engine panel while nothing is loaded.
+const EMPTY_HINT = 'Paste a PGN below or load the sample game to start a review.';
+
+// A one-click sample game (Morphy's "Opera Game", 1858).
 const SAMPLE_PGN = `[Event "Paris Opera"]
 [Site "Paris FRA"]
 [Date "1858.??.??"]
@@ -64,12 +67,13 @@ export const analysisScreen = {
             </label>
             <button class="btn btn-primary analyze-btn">Analyze</button>
           </div>
+          <div class="import-error" role="alert" hidden></div>
           <div class="sample-row"><button class="text-link sample-btn">Load sample game</button></div>
         </div>
 
         <div class="analysis-progress" hidden>
           <div class="progress-track"><div class="progress-fill"></div></div>
-          <span class="progress-text">Analyzing…</span>
+          <span class="progress-text"></span>
         </div>
 
         <div class="accuracy-block" hidden>
@@ -112,10 +116,12 @@ export const analysisScreen = {
     const engineDepthEl = wrap.querySelector('.engine-depth');
     const engineLinesEl = wrap.querySelector('.engine-lines');
     const assessEl = wrap.querySelector('.move-assessment');
+    const importErrorEl = wrap.querySelector('.import-error');
 
     let report = null;
     let cursor = 0;
     let engine = null;
+    let run = null; // AbortController for the in-flight full-game analysis
 
     function currentFen() {
       if (!report) return new Chess().fen();
@@ -142,19 +148,26 @@ export const analysisScreen = {
     }
 
     // Live multi-line engine analysis of the current position.
+    // Only runs with a report loaded; results for a position we've since left
+    // (or a review that was cleared) are dropped.
     function runLiveEngine(fen) {
-      if (!fen || !engine) return;
+      if (!fen || !engine || !report) return;
+      const stale = () => !report || fen !== currentFen();
       engineLinesEl.classList.add('thinking');
       engine
         .analyze(fen, {
           depth: LIVE_DEPTH,
           multiPv: LIVE_MULTIPV,
-          onUpdate: (lines) => renderEngineLines(lines, fen),
+          onUpdate: (lines) => {
+            if (!stale()) renderEngineLines(lines, fen);
+          },
         })
         .then((lines) => {
+          if (stale()) return;
           engineLinesEl.classList.remove('thinking');
           renderEngineLines(lines, fen);
-        });
+        })
+        .catch(() => engineLinesEl.classList.remove('thinking'));
     }
 
     function renderEngineLines(lines, fen) {
@@ -240,6 +253,17 @@ export const analysisScreen = {
 
     function showReport() {
       progressEl.hidden = true;
+      engineLinesEl.innerHTML = '';
+      engineDepthEl.textContent = '';
+      // A cached report skips the batch pass, so make sure the live panel has
+      // an engine to talk to.
+      if (!engine) {
+        try {
+          engine = getEngine();
+        } catch {
+          /* engine unavailable: the review still shows, just without live lines */
+        }
+      }
       graph.setSeries(report.evalSeries);
       renderMoveList();
       accBlock.hidden = false;
@@ -250,42 +274,102 @@ export const analysisScreen = {
       goTo(0);
     }
 
+    // Drop the current review: no report, no engine lines, nothing in progress.
+    function clearReview() {
+      report = null;
+      cursor = 0;
+      if (engine) engine.stop();
+      board.setPosition(new Chess().fen());
+      board.highlightLastMove(null, null);
+      evalBar.clear();
+      graph.setSeries([]);
+      moveListEl.innerHTML = '';
+      accBlock.hidden = true;
+      progressEl.hidden = true;
+      progressText.textContent = '';
+      assessEl.hidden = true;
+      engineDepthEl.textContent = '';
+      engineLinesEl.classList.remove('thinking');
+      engineLinesEl.innerHTML = '';
+    }
+
+    // Empty state: nothing loaded and no engine work, just a prompt.
+    function showEmpty() {
+      clearReview();
+      engineLinesEl.innerHTML = `<p class="engine-empty">${EMPTY_HINT}</p>`;
+    }
+
+    function showImportError(message) {
+      importErrorEl.textContent = message;
+      importErrorEl.hidden = false;
+    }
+
+    function hideImportError() {
+      importErrorEl.hidden = true;
+      importErrorEl.textContent = '';
+    }
+
     async function runAnalysis(pgn) {
+      hideImportError();
+      // Blank, unreadable or move-less input never reaches the engine.
+      try {
+        parseGame(pgn);
+      } catch (err) {
+        showImportError(err.message);
+        return;
+      }
+
+      // Latest submit wins: stop feeding positions from any earlier run.
+      if (run) run.abort();
+      const ctl = new AbortController();
+      run = ctl;
       const depth = Number(wrap.querySelector('.depth-select').value);
 
       // Instant path: reuse a cached report for this exact game + depth.
       const cached = getCachedAnalysis(pgn, depth);
       if (cached) {
+        run = null;
         report = cached;
         showReport();
         return;
       }
 
+      clearReview();
       try {
         engine = getEngine();
       } catch {
-        progressText.textContent = 'Engine failed to load.';
+        run = null;
+        showEmpty();
+        showImportError('The engine failed to load. Reload the page to try again.');
         return;
       }
       progressEl.hidden = false;
-      accBlock.hidden = true;
       progressFill.style.width = '0%';
       progressText.textContent = 'Starting engine…';
 
+      let result;
       try {
-        report = await analyzeGame(pgn, engine, {
+        result = await analyzeGame(pgn, engine, {
           depth,
+          signal: ctl.signal,
           onProgress: (done, total) => {
+            if (ctl.signal.aborted) return;
             const pct = Math.round((done / total) * 100);
             progressFill.style.width = `${pct}%`;
             progressText.textContent = `Analyzing… ${done}/${total} positions`;
           },
         });
       } catch (err) {
-        progressText.textContent = `Could not analyze: ${err.message}`;
+        if (ctl.signal.aborted) return; // superseded or screen left; not an error
+        run = null;
+        showEmpty();
+        showImportError(`Could not analyze: ${err.message}`);
         return;
       }
+      if (ctl.signal.aborted) return;
+      run = null;
 
+      report = result;
       setCachedAnalysis(pgn, depth, report); // remember for next time
       showReport();
     }
@@ -304,47 +388,43 @@ export const analysisScreen = {
       goTo(cursor);
     });
     wrap.querySelector('.analyze-btn').addEventListener('click', () => {
-      const pgn = pgnInput.value.trim();
-      if (pgn) runAnalysis(pgn);
+      runAnalysis(pgnInput.value);
     });
     wrap.querySelector('.sample-btn').addEventListener('click', () => {
       pgnInput.value = SAMPLE_PGN;
       runAnalysis(SAMPLE_PGN);
     });
+    // Editing (or clearing) the input dismisses a stale error; whatever review
+    // is on screen stays until a new game is submitted.
+    pgnInput.addEventListener('input', hideImportError);
     wrap.querySelector('.back-link').addEventListener('click', () => navigate('menu'));
 
     this._onKey = (e) => {
+      if (e.target.matches('input, textarea, select')) return;
       if (e.key === 'ArrowLeft') goTo(cursor - 1);
       else if (e.key === 'ArrowRight') goTo(cursor + 1);
     };
     window.addEventListener('keydown', this._onKey);
 
+    // Leaving the screen cancels any full-game pass and live search. Only
+    // touches an engine this screen actually started.
+    this._teardown = () => {
+      if (run) run.abort();
+      if (engine) engine.stop();
+    };
+
+    // No game handed over: a clean empty state. The engine isn't started until
+    // there's something to analyze.
+    showEmpty();
     if (presetPgn) {
       pgnInput.value = presetPgn;
       runAnalysis(presetPgn);
-    } else {
-      // Default state: a full board in the starting position with the engine
-      // already thinking, so the lab is never empty.
-      try {
-        engine = getEngine();
-        const startFen = new Chess().fen();
-        board.setPosition(startFen);
-        board.highlightLastMove(null, null);
-        evalBar.setEval({ scoreCp: 0 });
-        runLiveEngine(startFen);
-      } catch {
-        /* engine unavailable */
-      }
     }
   },
 
   unmount() {
     if (this._onKey) window.removeEventListener('keydown', this._onKey);
-    try {
-      getEngine().stop();
-    } catch {
-      /* engine may not exist */
-    }
+    if (this._teardown) this._teardown();
   },
 };
 

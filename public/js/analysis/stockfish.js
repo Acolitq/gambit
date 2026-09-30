@@ -17,12 +17,17 @@ export class Engine {
   constructor() {
     this.worker = new Worker(ENGINE_URL);
     this.ready = false;
-    this._readyWaiters = [];
-    this._job = null; // { fen, sideToMove, multiPv, depth, lines, onUpdate, resolve, mode }
+    this.failed = null; // Error once the worker dies; pending and new requests reject
+    this._readyWaiters = []; // { resolve, reject }
+    this._job = null; // { fen, sideToMove, multiPv, depth, lines, onUpdate, resolve, reject, mode }
     this._pendingJob = null; // queued job waiting for current search to stop
     this._multiPv = 1;
     this.worker.onmessage = (e) =>
       this._onLine(typeof e.data === 'string' ? e.data : e.data?.data);
+    // A missing script or failed WASM init surfaces here. Without it, callers
+    // would wait on whenReady() forever and the UI would sit on "Starting engine…".
+    this.worker.onerror = () =>
+      this._fail(new Error(this.ready ? 'The engine stopped unexpectedly.' : 'The engine failed to load.'));
     this._send('uci');
     this._send('isready');
   }
@@ -37,7 +42,7 @@ export class Engine {
     if (line.startsWith('uciok') || line === 'readyok') {
       if (!this.ready) {
         this.ready = true;
-        this._readyWaiters.forEach((fn) => fn());
+        this._readyWaiters.forEach((w) => w.resolve());
         this._readyWaiters = [];
       }
       return;
@@ -73,8 +78,20 @@ export class Engine {
   }
 
   whenReady() {
+    if (this.failed) return Promise.reject(this.failed);
     if (this.ready) return Promise.resolve();
-    return new Promise((r) => this._readyWaiters.push(r));
+    return new Promise((resolve, reject) => this._readyWaiters.push({ resolve, reject }));
+  }
+
+  // The worker is gone: reject everything waiting on it so nothing hangs.
+  _fail(err) {
+    if (this.failed) return;
+    this.failed = err;
+    this._readyWaiters.forEach((w) => w.reject(err));
+    this._readyWaiters = [];
+    for (const job of [this._job, this._pendingJob]) if (job) job.reject(err);
+    this._job = null;
+    this._pendingJob = null;
   }
 
   _setMultiPv(n) {
@@ -115,7 +132,8 @@ export class Engine {
   _run(fen, opts) {
     return this.whenReady().then(
       () =>
-        new Promise((resolve) => {
+        new Promise((resolve, reject) => {
+          if (this.failed) return reject(this.failed);
           const job = {
             fen,
             sideToMove: fen.split(' ')[1] || 'w',
@@ -125,6 +143,7 @@ export class Engine {
             onUpdate: opts.onUpdate,
             mode: opts.mode,
             resolve,
+            reject,
           };
           if (this._job) {
             // Supersede whatever is running: remember this as pending and stop

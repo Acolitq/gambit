@@ -34,12 +34,34 @@ function classify(cpLoss, wasBest) {
   return { key: 'ok', label: '', symbol: '' };
 }
 
+// Parse a PGN for review and return the loaded game. Throws an Error with a
+// user-facing message when there is nothing to analyze (blank input, unreadable
+// PGN, or a game with no moves), so callers can show it inline before any
+// engine work starts.
+export function parseGame(pgn) {
+  const text = String(pgn ?? '').trim();
+  if (!text) throw new Error('Paste a PGN to start a review.');
+  const chess = new Chess();
+  try {
+    chess.loadPgn(text);
+  } catch (err) {
+    const bad = /^Invalid move in PGN: (.+)$/.exec(err?.message || '');
+    throw new Error(
+      bad
+        ? `Couldn't read that PGN: "${bad[1]}" isn't a legal move.`
+        : "Couldn't read that PGN. Check the move text and try again.",
+    );
+  }
+  if (!chess.history().length) throw new Error('That PGN has no moves to review.');
+  return chess;
+}
+
 // Analyze a full game given as PGN. Evaluates every position with the engine and
 // annotates each move. `onProgress(done, total)` is called as it works so the UI
-// can show a progress bar. Returns a structured report.
-export async function analyzeGame(pgn, engine, { depth = 12, onProgress } = {}) {
-  const chess = new Chess();
-  chess.loadPgn(pgn);
+// can show a progress bar; aborting `signal` stops it between positions (so a
+// superseded run doesn't keep stealing the shared engine). Returns a report.
+export async function analyzeGame(pgn, engine, { depth = 12, onProgress, signal } = {}) {
+  const chess = parseGame(pgn);
   const history = chess.history({ verbose: true }); // moves in order
 
   // Rebuild the sequence of FENs: position[0] is the start, position[i] is after
@@ -54,10 +76,12 @@ export async function analyzeGame(pgn, engine, { depth = 12, onProgress } = {}) 
   const total = fens.length;
   const evals = [];
   for (let i = 0; i < fens.length; i++) {
+    if (signal?.aborted) throw abortError();
     const r = await engine.evaluate(fens[i], depth);
     evals.push(r);
     if (onProgress) onProgress(i + 1, total);
   }
+  if (signal?.aborted) throw abortError();
 
   // Annotate each move using the eval before and after it.
   const moves = [];
@@ -110,6 +134,12 @@ export async function analyzeGame(pgn, engine, { depth = 12, onProgress } = {}) 
     summary: summarize(moves),
     headers: chess.header(),
   };
+}
+
+function abortError() {
+  const err = new Error('Analysis cancelled.');
+  err.name = 'AbortError';
+  return err;
 }
 
 // Centipawn loss for a move, from the mover's perspective, clamped at 0.
